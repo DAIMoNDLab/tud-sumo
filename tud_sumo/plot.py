@@ -2299,8 +2299,8 @@ class MultiPlotter(_GenericPlotter):
             elif data_key == "avg_delay": key, avg = "delay", True
             else: key, avg = data_key, False
 
-            y_vals = self.sim_data["data"]["vehicles"][key]
-            if avg: y_vals = [y_val / n_vehicles for y_val, n_vehicles in zip(y_vals, self.sim_data["data"]["vehicles"]["no_vehicles"])]
+            y_vals = sim_data["data"]["vehicles"][key]
+            if avg: y_vals = [y_val / n_vehicles for y_val, n_vehicles in zip(y_vals, sim_data["data"]["vehicles"]["no_vehicles"])]
 
             if plot_cumulative: y_vals = get_cumulative_arr(y_vals)
             x_vals = get_time_steps(y_vals, self.time_unit, step, start)
