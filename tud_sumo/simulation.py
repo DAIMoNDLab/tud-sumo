@@ -1,11 +1,13 @@
 import os, sys, io, traci, sumolib, json, csv, math, inspect, importlib.util
 import pickle as pkl
 import numpy as np
+from shutil import rmtree
 from tqdm import tqdm
 from copy import copy, deepcopy
 from random import choices, choice, random, seed as set_seed
 from .events import EventScheduler, Event
 from .controllers import VSLController, RGController
+from .videos import Recorder
 from shapely.geometry import LineString, Point
 from .utils import *
 
@@ -15,8 +17,8 @@ class Simulation:
     def __init__(self, scenario_name: str|None = None, scenario_desc: str|None = None) -> None:
         """
         Args:
-            `scenario_name` (str, None): Scenario label saved to simulation object (defaults to name of '_.sumocfg_')
-            `scenario_desc` (str, None): Simulation scenario description, saved along with all files
+            `scenario_name` (str, optional):Scenario label saved to simulation object (defaults to name of '_.sumocfg_')
+            `scenario_desc` (str, optional):Simulation scenario description, saved along with all files
         """
 
         self.curr_step = 0
@@ -75,7 +77,7 @@ class Simulation:
                                      "vehicle_type", "departure", "origin", "destination"] 
         
         self._default_view = 'View #0'
-        self._recordings = {}
+        self._recorder = None
 
     def __str__(self):
         if self.scenario_name != None:
@@ -91,12 +93,12 @@ class Simulation:
         Intialises SUMO simulation.
 
         Args:
-            `config_file` (str, None): Location of '_.sumocfg_' file (can be given instead of net_file)
-            `net_file` (str, None): Location of '_.net.xml_' file (can be given instead of config_file)
-            `route_file` (str, None): Location of '_.rou.xml_' route file
-            `add_file` (str, None): Location of '_.add.xml_' additional file
-            `gui_file` (str, None): Location of '_.xml_' gui (view settings) file
-            `cmd_options` (list, None): List of any other command line options
+            `config_file` (str, optional):Location of '_.sumocfg_' file (can be given instead of net_file)
+            `net_file` (str, optional):Location of '_.net.xml_' file (can be given instead of config_file)
+            `route_file` (str, optional):Location of '_.rou.xml_' route file
+            `add_file` (str, optional):Location of '_.add.xml_' additional file
+            `gui_file` (str, optional):Location of '_.xml_' gui (view settings) file
+            `cmd_options` (list, optional):List of any other command line options
             `units` (str, int): Data collection units [1 (metric) | 2 (IMPERIAL) | 3 (UK)] (defaults to 'metric')
             `get_individual_vehicle_data` (bool): Denotes whether to get individual vehicle data (set to `False` to improve performance)
             `automatic_subscriptions` (bool): Denotes whether to automatically subscribe to commonly used vehicle data (speed and position, defaults to `True`)
@@ -105,7 +107,7 @@ class Simulation:
             `suppress_pbar` (bool): Suppress automatic progress bar when not using the GUI
             `seed` (bool): Either int to be used as seed, or `random.random()`/`random.randint()`, where a random seed is used
             `gui` (bool): Bool denoting whether to run GUI
-            `sumo_home` (str, None): SUMO base directory, if the `$SUMO_HOME` variable is not already set within the environment
+            `sumo_home` (str, optional):SUMO base directory, if the `$SUMO_HOME` variable is not already set within the environment
         """
 
         if isinstance(sumo_home, str):
@@ -296,9 +298,9 @@ class Simulation:
         Save parameters of all TUD-SUMO objects created for the simulation (tracked edges/junctions, phases, controllers, events, demand, routes).
 
         Args:
-            `filename` (str, None): Output filename ('_.json_' or '_.pkl_')
+            `filename` (str, optional):Output filename ('_.json_' or '_.pkl_')
             `overwrite` (bool): Denotes whether to overwrite previous outputs
-            `json_indent` (int, None): Indent used when saving JSON files
+            `json_indent` (int, optional):Indent used when saving JSON files
         """
 
         object_params = {}
@@ -563,8 +565,8 @@ class Simulation:
             `routing` (str, list, tuple): Either a route ID or OD pair of edge IDs
             `step_range` (str, list, tuple): (2x1) list or tuple denoting the start and end steps of the demand
             `demand` (int, float): Generated flow in vehicles/hour
-            `vehicle_types` (str, list, tuple, None): List of vehicle type IDs
-            `vehicle_type_dists` (list, tuple, None): Vehicle type distributions used when generating flow
+            `vehicle_types` (str, list, tuple, optional):List of vehicle type IDs
+            `vehicle_type_dists` (list, tuple, optional):Vehicle type distributions used when generating flow
             `initial_speed` (str, int, float): Initial speed at insertion, either ['_max_'|'_random_'] or number > 0
             `origin_lane` (str, int): Lane for insertion at origin, either ['_random_'|'_free_'|'_allowed_'|'_best_'|'_first_'] or lane index
             `origin_pos` (str, int): Longitudinal position at insertion, either ['_random_'|'_free_'|'_random\_free_'|'_base_'|'_last_'|'_stop_'|'_splitFront_'] or offset
@@ -629,9 +631,9 @@ class Simulation:
             `routing` (str, list, tuple): Either a route ID or OD pair of edge IDs
             `step_range` (list, tuple): (2x1) list or tuple denoting the start and end steps of the demand
             `demand_function` (function): Function used to calculate flow (vehicles/hour)
-            `parameters` (dict, None): Dictionary containing extra parameters for the demand function
-            `vehicle_types` (str, list, tuple, None): List of vehicle type IDs
-            `vehicle_type_dists` (list, tuple, None): Vehicle type distributions used when generating flow
+            `parameters` (dict, optional):Dictionary containing extra parameters for the demand function
+            `vehicle_types` (str, list, tuple, optional):List of vehicle type IDs
+            `vehicle_type_dists` (list, tuple, optional):Vehicle type distributions used when generating flow
             `initial_speed` (str, int, float): Initial speed at insertion, either ['_max_'|'_random_'] or number > 0
             `origin_lane` (str, int, float): Lane for insertion at origin, either ['_random_'|'_free_'|'_allowed_'|'_best_'|'_first_'] or lane index
             `origin_pos` (str, int): Longitudinal position at insertion, either ['_random_'|'_free_'|'_random\_free_'|'_base_'|'_last_'|'_stop_'|'_splitFront_'] or offset
@@ -726,7 +728,7 @@ class Simulation:
         Initalise junctions and start tracking states and flows. Defaults to all junctions with traffic lights.
         
         Args:
-            `junctions` (str, list, tuple, dict, None): Junction IDs or list of IDs, or dict containing junction(s) parameters
+            `junctions` (str, list, tuple, dict, optional):Junction IDs or list of IDs, or dict containing junction(s) parameters
         """
 
         self.track_juncs = True
@@ -815,6 +817,10 @@ class Simulation:
     def end(self) -> None:
         """ Ends the simulation. """
 
+        if self._recorder != None:
+            for recording in self._recorder.get_recordings():
+                self.save_recording(recording)
+
         try:
             traci.close()
         except traci.exceptions.FatalTraCIError:
@@ -826,9 +832,9 @@ class Simulation:
         Save all vehicle, detector and junction data in a JSON or pickle file.
         
         Args:
-            `filename` (str, None): Output filepath (defaults to '_./{scenario_name}.json_')
+            `filename` (str, optional):Output filepath (defaults to '_./{scenario_name}.json_')
             `overwrite` (bool): Prevent previous outputs being overwritten
-            `json_indent` (int, None): Indent used when saving JSON files
+            `json_indent` (int, optional):Indent used when saving JSON files
         """
 
         if filename == None:
@@ -866,7 +872,7 @@ class Simulation:
         Initalise edges and start collecting data.
         
         Args:
-            `edge_ids` (str, list, None): List of edge IDs or single ID, defaults to all
+            `edge_ids` (str, list, optional):List of edge IDs or single ID, defaults to all
         """
 
         if edge_ids == None: edge_ids = self._all_edges
@@ -938,13 +944,13 @@ class Simulation:
         Step through simulation from the current time until end_step, aggregating data during this period.
         
         Args:
-            `n_steps` (int, None): Perform n steps of the simulation (defaults to 1)
-            `end_step` (int, None): End point for stepping through simulation (given instead of `n_steps` or `n_seconds`)
-            `n_seconds` (int, None): Simulation duration in seconds (given instead of `n_steps` or `end_step`)
-            `vehicle_types` (list, tuple, None): Vehicle type(s) to collect data of (type ID or list of IDs, defaults to all)
+            `n_steps` (int, optional):Perform n steps of the simulation (defaults to 1)
+            `end_step` (int, optional):End point for stepping through simulation (given instead of `n_steps` or `n_seconds`)
+            `n_seconds` (int, optional):Simulation duration in seconds (given instead of `n_steps` or `end_step`)
+            `vehicle_types` (list, tuple, optional):Vehicle type(s) to collect data of (type ID or list of IDs, defaults to all)
             `keep_data` (bool): Denotes whether to store and process data collected during this run (defaults to `True`)
             `append_data` (bool): Denotes whether to append simulation data to that of previous runs or overwrite previous data (defaults to `True`)
-            `pbar_max_steps` (int, None): Max value for progress bar (persistent across calls) (negative values remove the progress bar)
+            `pbar_max_steps` (int, optional):Max value for progress bar (persistent across calls) (negative values remove the progress bar)
         
         Returns:
             dict: All data collected through the time period, separated by detector
@@ -1084,7 +1090,7 @@ class Simulation:
         Increment simulation by one time step, updating light state. Use `Simulation.step_through()` to run the simulation.
         
         Args:
-            `vehicle_types` (list, None): Vehicle type(s) to collect data of (type ID or list of IDs, defaults to all)
+            `vehicle_types` (list, optional):Vehicle type(s) to collect data of (type ID or list of IDs, defaults to all)
             `keep_data` (bool): Denotes whether to store and process data collected during this run (defaults to `True`)
 
         Returns:
@@ -1098,16 +1104,17 @@ class Simulation:
         if self._manual_flow:
             self._add_demand_vehicles()
 
-        recording_ids = list(self._recordings.keys())
-        for recording_id in recording_ids:
-            recording_data = self._recordings[recording_id]
-            if "vehicle_id" in recording_data and recording_data["vehicle_id"] not in self._all_curr_vehicle_ids:
-                self.save_recording(recording_id)
-                continue
-
-            self.take_screenshot(recording_data["bounds"],
-                                 filename=f"{recording_data['frames_loc']}/f_{self.curr_step-recording_data['start_step']}.png",
-                                 view_id=recording_data["view_id"])
+        if self._recorder != None:
+            recording_ids = self._recorder.get_recordings()
+            for recording_id in recording_ids:
+                recording_data = self._recorder.get_recording_data(recording_id)
+                if "vehicle_id" in recording_data and recording_data["vehicle_id"] not in self._all_curr_vehicle_ids:
+                    self._recorder.save_recording(recording_id)
+                    continue
+                
+                frame_file = f"{recording_data['frames_loc']}/f_{self.curr_step-recording_data['start_step']}.png"
+                self.take_screenshot(recording_data["view_id"], frame_file, recording_data["bounds"], recording_data["zoom"])
+                recording_data["frame_files"].append(frame_file)
         
         # Step through simulation
         traci.simulationStep()
@@ -1402,7 +1409,7 @@ class Simulation:
         
         Args:
             `functions` (function, list): Function or list of functions
-            `parameters` (dict, None): Dictionary containing values for extra custom parameters
+            `parameters` (dict, optional):Dictionary containing values for extra custom parameters
         """
 
         self._add_v_func(functions, parameters, self._v_out_funcs, self._valid_v_func_params[:3])
@@ -1544,7 +1551,7 @@ class Simulation:
         
         Args:
             `detector_ids` (str, list, tuple): Detector ID or list of IDs (defaults to all)
-            `vehicle_types` (list, None): Included vehicle types
+            `vehicle_types` (list, optional):Included vehicle types
             `flatten` (bool): If true, all IDs are returned in a 1D array, else a dict with vehicles for each detector
         
         Returns:
@@ -2020,7 +2027,7 @@ class Simulation:
             `g_time` (int, float): Green phase duration (s), defaults to 1
             `y_time` (int, float): Yellow phase duration (s), defaults to 1
             `min_red` (int, float): Minimum red phase duration (s), defaults to 1
-            `vehs_per_cycle` (int, None): Number of vehicles released with each cycle, defaults to the number of lanes
+            `vehs_per_cycle` (int, optional):Number of vehicles released with each cycle, defaults to the number of lanes
             `control_interval` (int, float): Ramp meter control interval (s)
         
         Returns:
@@ -2109,7 +2116,7 @@ class Simulation:
         Update light settings for given junctions.
         
         Args:
-            `junction_ids` (list, str, None): Junction ID, or list of IDs (defaults to all)
+            `junction_ids` (list, str, optional):Junction ID, or list of IDs (defaults to all)
         """
 
         if junction_ids is None: junction_ids = self._junc_phases.keys()
@@ -2229,14 +2236,14 @@ class Simulation:
         
         Args:
             `duration` (int): Duration of incident (in simulation steps)
-            `vehicle_ids` (str, list, tuple, None): Vehicle ID or list of IDs to include in the incident
-            `geometry_ids` (str, list, tuple, None): Geometry ID or list of IDs to randomly select vehicles from
+            `vehicle_ids` (str, list, tuple, optional):Vehicle ID or list of IDs to include in the incident
+            `geometry_ids` (str, list, tuple, optional):Geometry ID or list of IDs to randomly select vehicles from
             `n_vehicles` (int): Number of vehicles in the incident, if randomly chosen
             `vehicle_separation` (float): Factor denoting how separated randomly chosen vehicles are (0.1-1)
             `assert_n_vehicles` (bool): Denotes whether to throw an error if the correct number of vehicles cannot be found
-            `edge_speed` (int, float, None): New max speed for edges where incident vehicles are located (defaults to 15km/h or 10mph)
+            `edge_speed` (int, float, optional):New max speed for edges where incident vehicles are located (defaults to 15km/h or 10mph)
             `highlight_vehicles` (bool): Denotes whether to highlight vehicles in the SUMO GUI
-            `incident_id` (str, None): Incident event ID used in the simulation data file (defaults to '_incident\_{n}_')
+            `incident_id` (str, optional):Incident event ID used in the simulation data file (defaults to '_incident\_{n}_')
 
         Returns:
             bool: Denotes whether incident was successfully created
@@ -2264,7 +2271,7 @@ class Simulation:
                 # A central edge is chosen (one that contains at least 1 vehicle)
                 while not found_central:
                     central_id = choice(all_geometry_ids)
-                    found_central = self.get_geometry_vals(central_id, "vehicle_count") > 0
+                    found_central = self.get_geometry_vals(central_id, "vehicle_count") > 0 and not central_id.startswith(":")
 
                 vehicle_separation = min(0.9, max(0, vehicle_separation))
                 searched, to_search, prob = [], [central_id], 1 - vehicle_separation
@@ -2295,7 +2302,7 @@ class Simulation:
                         to_search += connected_edges['outgoing']
 
                         # If there are still not enough vehicles, we then search an adjacent edge.
-                        to_search = [g_id for g_id in to_search if g_id not in searched]
+                        to_search = [g_id for g_id in to_search if g_id not in searched and not g_id.startswith(":")]
 
                 geometry_ids = list(set(geometry_ids))
 
@@ -2757,7 +2764,7 @@ class Simulation:
         Return list of IDs for all vehicles currently in the simulation.
         
         Args:
-            `vehicle_types` (str, list, tuple, None): Vehicle type ID or list of IDs (defaults to all)
+            `vehicle_types` (str, list, tuple, optional):Vehicle type ID or list of IDs (defaults to all)
 
         Returns:
             list: All current vehicle IDs
@@ -2825,7 +2832,7 @@ class Simulation:
         Return list of IDs for all edges and lanes in the network.
         
         Args:
-            `geometry_types` (str, list, tuple, None): Geometry type ['_edge_'|'_lane_'] or list of types
+            `geometry_types` (str, list, tuple, optional):Geometry type ['_edge_'|'_lane_'] or list of types
         
         Returns:
             list: All geometry types (of type)
@@ -2855,7 +2862,7 @@ class Simulation:
         Return list of IDs for all edges and lanes in the network.
         
         Args:
-            `detector_types` (str, list, tuple, None): Detector type ['_multientryexit_'|'_inductionloop_'] or list of types
+            `detector_types` (str, list, tuple, optional):Detector type ['_multientryexit_'|'_inductionloop_'] or list of types
         
         Returns:
             list: All detector IDs (of type)
@@ -3017,7 +3024,7 @@ class Simulation:
         
         Args:
             `routing` (list, tuple): List of edge IDs
-            `route_id` (str, None): Route ID, if not given, generated from origin-destination
+            `route_id` (str, optional):Route ID, if not given, generated from origin-destination
             `assert_new_id` (bool): If True, an error is thrown for duplicate route IDs
         """
         
@@ -3232,7 +3239,7 @@ class Simulation:
             `vehicle_ids` (str, list, tuple): Vehicle ID or list of IDs
         
         Returns:
-            (dict, None): Vehicle data dictionary, returns None if does not exist in simulation
+            (dict, optional):Vehicle data dictionary, returns None if does not exist in simulation
         """
 
         all_vehicle_data = {}
@@ -3301,7 +3308,7 @@ class Simulation:
         Collects aggregated vehicle data (no. vehicles & no. waiting vehicles) and all individual vehicle data.
         
         Args:
-            `vehicle_types` (list, tuple, None): Type(s) of vehicles to include
+            `vehicle_types` (list, tuple, optional):Type(s) of vehicles to include
         
         Returns:
             dict: no vehicles, no waiting, all vehicle data
@@ -3357,8 +3364,9 @@ class Simulation:
             total_vehicle_data["delay"] += lane_delay
 
         total_vehicle_data["to_depart"] = len(self._all_to_depart_vehicle_ids)
-        #total_vehicle_data["no_vehicles"] += total_vehicle_data["to_depart"]
-        #total_vehicle_data["delay"] += total_vehicle_data["to_depart"] * self.step_length
+
+        # Delay of vehicles waiting to be inserted into the simulation (veh*s)
+        #total_vehicle_data["insertion_delay"] = total_vehicle_data["to_depart"] * self.step_length
 
         return total_vehicle_data, all_vehicle_data
     
@@ -3632,7 +3640,7 @@ class Simulation:
         
         Args:
             `geometry_ids` (str, list):  Edge/lane ID or list of IDs
-            `vehicle_types` (list, None): Included vehicle type IDs
+            `vehicle_types` (list, optional):Included vehicle type IDs
             `flatten` (bool): If `True`, all IDs are returned in a 1D array, else a dict with vehicles for each edge/lane
         
         Returns:
@@ -3665,7 +3673,7 @@ class Simulation:
             `geometry_id` (str, int): Lane or edge ID
         
         Returns:
-            (str, None):   Geometry type ['_edge_'|'_lane_'], or `None` if it does not exist
+            (str, optional):  Geometry type ['_edge_'|'_lane_'], or `None` if it does not exist
         """
 
         geometry_id = validate_type(geometry_id, str, "geometry_id", self.curr_step)
@@ -3682,7 +3690,7 @@ class Simulation:
             `detector_id` (str): Detector ID
         
         Returns:
-            (str, None): Detector type, or `None` if it does not exist
+            (str, optional):Detector type, or `None` if it does not exist
         """
 
         detector_id = validate_type(detector_id, str, "detector_id", self.curr_step)
@@ -3699,7 +3707,7 @@ class Simulation:
             `route_id` (str): Route ID
         
         Returns:
-            (str, None): List of route edges, or `None` if it does not exist.
+            (str, optional):List of route edges, or `None` if it does not exist.
         """
 
         route_id = validate_type(route_id, str, "route_id", self.curr_step)
@@ -3728,7 +3736,7 @@ class Simulation:
         Return event IDs by status, one or more of '_scheduled_', '_active_' or '_completed_'.
         
         Args:
-            `event_statuses` (str, list, tuple, None): Event status type or list of types
+            `event_statuses` (str, list, tuple, optional):Event status type or list of types
         
         Returns:
             list: List of event IDs
@@ -3755,7 +3763,7 @@ class Simulation:
             `event_id` (str): Event ID
         
         Returns:
-            (str, None): Returns `None` if it does not exist, otherwise status ['_scheduled_'|'_active_'|'_completed_']
+            (str, optional):Returns `None` if it does not exist, otherwise status ['_scheduled_'|'_active_'|'_completed_']
         """
 
         if self._scheduler == None: return None
@@ -3769,7 +3777,7 @@ class Simulation:
             `controller_id` (str): Controller ID
         
         Returns:
-            (str, None): Returns `None` if it does not exist, otherwise type ['_VSLController_'|'_RGController_']
+            (str, optional):Returns `None` if it does not exist, otherwise type ['_VSLController_'|'_RGController_']
         """
 
         if controller_id in self.controllers: return self.controllers[controller_id].__name__()
@@ -3780,7 +3788,7 @@ class Simulation:
         Return list of all controller IDs, or controllers of specified type ('VSLController' or 'RGController').
         
         Args:
-            `controller_types` (str, list, tuple, None): Controller type, defaults to all
+            `controller_types` (str, list, tuple, optional):Controller type, defaults to all
         
         Returns:
             list: Controller IDs
@@ -3819,106 +3827,85 @@ class Simulation:
                 desc = "Controller with ID '{0}' not found.".format(controller_id)
                 raise_error(KeyError, desc, self.curr_step)
 
-    def gui_track_vehicle(self, vehicle_id, view_id=None):
+    def gui_track_vehicle(self, vehicle_id: str, view_id: str|None = None, highlight: bool = True) -> None:
+        """
+        Sets GUI view to track a vehicle by ID.
 
+        Args:
+            `vehicle_id` (str): Vehicle ID
+            `view_id` (str, optional):View ID, if `None` uses default
+        """
+        
         if not self._gui:
             desc = f"Cannot track vehicle '{vehicle_id}' (GUI is not active)."
             raise_error(SimulationError, desc, self.curr_step)
 
+        if not self.vehicle_exists(vehicle_id):
+            desc = "Unrecognised vehicle ID given ('{0}').".format(vehicle_id)
+            raise_error(KeyError, desc, self.curr_step)
+
         if view_id == None: view_id = self._default_view
-        
+        if highlight: self.set_vehicle_vals(vehicle_id, highlight=True)
+
         traci.gui.trackVehicle(view_id, vehicle_id)
 
-    def gui_record_vehicle(self, vehicle_id, recording_name, zoom=None, frames_loc=None, view_id=None):
-        
-        spec = importlib.util.find_spec('cv2')
-        if spec is None:
-            desc = "OpenCV is required to create recordings. Install OpenCV and try again."
-            raise_error(ImportError, desc, self.curr_step)
-        
+    def gui_stop_tracking(self, view_id: str) -> None:
+        """
+        Stops GUI view from tracking vehicle.
+
+        Args:
+            `view_id` (str): View ID
+        """
+
         if not self._gui:
-            desc = f"Cannot record vehicle '{vehicle_id}' (GUI is not active)."
+            desc = f"GUI is not active."
             raise_error(SimulationError, desc, self.curr_step)
-        
-        if recording_name in self._recordings:
-            desc = f"Invalid recording_name '{recording_name}' (already in use)."
-            raise_error(ValueError, desc, self.curr_step)
 
         if view_id == None: view_id = self._default_view
-        if view_id in [recording["view_id"] for recording in self._recordings]:
-            desc = f"Invalid view ID '{view_id}' (already in use)."
+
+        if not traci.gui.hasView(view_id):
+            desc = f"View ID '{view_id}' not found."
+            raise_error(KeyError, desc, self.curr_step)
+        
+        traci.gui.trackVehicle(view_id, "")
+
+    def set_view(self, view_id: str, bounds: list|tuple|None = None, zoom: int|float|None = None) -> None:
+        """
+        Sets the bounds and/or zoom level of a GUI view.
+
+        Args:
+            `view_id` (str): View ID
+            `bounds` (list, tuple, optional): View bounds coordinates (lower-left, upper-right)
+            `zoom` (int, float, optional): Zoom level
+        """
+
+        if bounds == None and zoom == None:
+            desc = "Invalid bounds and zoom (both cannot be 'None')."
             raise_error(ValueError, desc, self.curr_step)
-        elif not traci.gui.hasView(view_id):
-            traci.gui.addView(view_id)
-
-        if frames_loc == None: frames_loc = recording_name+"_frames"
-        if frames_loc in [recording["frames_loc"] for recording in self._recordings]:
-            desc = f"Invalid frames_loc '{frames_loc}' (already in use)."
-            raise_error(ValueError, desc, self.curr_step)
-        elif not os.path.exists(frames_loc):
-            os.makedirs(frames_loc)
-
-        default_bounds = traci.gui.getBoundary(view_id)
-        default_zoom = traci.gui.getZoom(view_id)
-
-        self._recordings[recording_name] = {"vehicle_id": vehicle_id,
-                                            "start_step": self.curr_step,
-                                            "bounds": None,
-                                            "default_bounds": default_bounds,
-                                            "default_zoom": default_zoom,
-                                            "frames_loc": frames_loc,
-                                            "view_id": view_id}
-
-        traci.gui.trackVehicle(view_id, vehicle_id)
+        
+        if bounds != None:
+            _ = validate_list_types(bounds, (tuple, tuple), True, "bounds", self.curr_step)
+            traci.gui.setBoundary(view_id, bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1])
         if zoom != None: traci.gui.setZoom(view_id, zoom)
 
-    def set_view_bounds(self, view_id, bounds, zoom=None):
-        traci.gui.setBoundary(view_id, bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1])
-        if zoom != None: traci.gui.setZoom(view_id, zoom)
+    def take_screenshot(self, view_id: str, filename: str, bounds: list|tuple|None = None, zoom: int|float|None = None) -> None:
+        """
+        Takes a screenshot of a GUI view and saves result to a file.
 
-    def take_screenshot(self, bounds=None, filename=None, view_id=None):
+        Args:
+            `view_id` (str): View ID
+            `filename` (str): Screenshot filename
+            `bounds` (list, tuple, optional):View bounds coordinates (lower-left, upper-right) (defaults to current bounds)
+            `zoom` (int, float, optional):Zoom level (defaults to current zoom)
+        """
 
         if not self._gui:
             desc = f"Cannot take screenshot (GUI is not active)."
             raise_error(SimulationError, desc, self.curr_step)
 
-        if bounds != None: self.set_view_bounds(bounds)
+        if bounds != None or zoom != None: self.set_view(view_id, bounds, zoom)
 
         traci.gui.screenshot(view_id, filename)
-
-    def save_recording(self, recording_name, video_filename=None, fps=None, delete_frames=True, delete_view=True):
-
-        if recording_name not in self._recordings:
-            desc = f"Recording '{recording_name} not found."
-            raise_error(KeyError, desc, self.curr_step)
-
-        if 'VideoWriter' not in dir(): from cv2 import VideoWriter, VideoWriter_fourcc, imread
-
-        if video_filename == None: video_filename = recording_name + ".mp4"
-        if fps == None: fps = 1 / self.step_length
-
-        recording_data = self._recordings[recording_name]
-        if delete_view and recording_data["view_id"] != self._default_view:
-            traci.gui.removeView(recording_data["view_id"])
-        else:
-            self.set_view_bounds(recording_data["view_id"], recording_data["default_bounds"], recording_data["default_zoom"])
-        
-        frames, frame_no, done = [], 1, False
-        while not done:
-            frame_file = f"{recording_data['frames_loc']}/f_{frame_no}.png"
-            if os.path.exists(frame_file):
-                frame = imread(frame_file)
-                frames.append(frame)
-                dimensions = frame.shape
-                frame_no += 1
-            else: done = True
-
-        vidwriter = VideoWriter(video_filename, VideoWriter_fourcc('m', 'p', '4', 'v'), 1.0, dimensions[:2])
-        for frame in frames:
-            vidwriter.write(frame)
-        vidwriter.release()
-
-        del self._recordings[recording_name]
 
     def print_summary(self, save_file=None) -> None:
         """
@@ -4417,7 +4404,7 @@ def print_summary(sim_data: dict|str, save_file: str|None=None, tab_width: int=5
     
     Args:
         `sim_data` (dict, str):  Simulation data dictionary or filepath
-        `save_file` (str, None): '_.txt_' filename, if given will be used to save summary
+        `save_file` (str, optional):'_.txt_' filename, if given will be used to save summary
         `tab_width` (int): Table width
     """
     caller = "{0}()".format(inspect.stack()[0][3])

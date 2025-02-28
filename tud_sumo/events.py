@@ -38,7 +38,7 @@ class EventScheduler:
         Gets all event IDs, or those of a specific status.
 
         Args:
-            `event_statuses` (str, list, tuple, None): Event status or list of statuses from ['_scheduled_'|'_active_'|'_completed_'] (defaults to all)
+            `event_statuses` (str, list, tuple, optional): Event status or list of statuses from ['_scheduled_'|'_active_'|'_completed_'] (defaults to all)
 
         Returns:
             list: List of event IDs
@@ -62,7 +62,7 @@ class EventScheduler:
         Gets all events, or those of a specific status.
 
         Args:
-            `event_statuses` (str, list, tuple, None): Event status or list of statuses from ['_scheduled_'|'_active_'|'_completed_'] (defaults to all)
+            `event_statuses` (str, list, tuple, optional): Event status or list of statuses from ['_scheduled_'|'_active_'|'_completed_'] (defaults to all)
 
         Returns:
             list: List of events
@@ -151,7 +151,7 @@ class EventScheduler:
             `event_id` (str): Event ID
         
         Returns:
-            (str, None): Event status ['_scheduled_'|'_active_'|'_completed_'], or `None` if it does not exist
+            (str, optional): Event status ['_scheduled_'|'_active_'|'_completed_'], or `None` if it does not exist
         """
 
         if event_id in self.scheduled_events.keys(): return "scheduled"

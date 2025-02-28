@@ -320,8 +320,8 @@ def load_params(parameters: str|dict, params_name: str|None = None, step: int|No
     
     Args:
         `parameters` (str, dict): Parameters dict or filepath
-        `params_name` (str, None): Parameter dict function (for error messages)
-        `step` (int, None): Current simulation step (for error messages)
+        `params_name` (str, optional): Parameter dict function (for error messages)
+        `step` (int, optional): Current simulation step (for error messages)
     
     Returns:
         dict: Parameters dict

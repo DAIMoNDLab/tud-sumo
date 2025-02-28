@@ -61,7 +61,7 @@ class VSLController:
         Activates the VSL controller and sets a speed limit.
         
         Args:
-            `speed_limt` (int, float, None): New speed limit, if not given, speed limit is set to last setting
+            `speed_limt` (int, float, optional): New speed limit, if not given, speed limit is set to last setting
         """
         
         if self.speed_limit == None and speed_limit == None:
@@ -196,10 +196,10 @@ class RGController:
         Activates route guidance for drivers.
         
         Args:
-            `old_target` (str, int, None): If given, only drivers going to `old_target` are diverted
-            `new_target` (str, int, None): New target for driver, either edge ID or route
-            `diversion_pct` (float, None): Used to only divert a percent of drivers (selected randomly)
-            `highlight_colour` (str, None): If given, diverted drivers are coloured
+            `old_target` (str, int, optional): If given, only drivers going to `old_target` are diverted
+            `new_target` (str, int, optional): New target for driver, either edge ID or route
+            `diversion_pct` (float, optional): Used to only divert a percent of drivers (selected randomly)
+            `highlight_colour` (str, optional): If given, diverted drivers are coloured
         """
         
         if self.target == None and new_target == None:
