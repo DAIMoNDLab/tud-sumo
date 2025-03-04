@@ -2608,6 +2608,7 @@ class Simulation:
         Calls the TraCI API to change a vehicle's state.
         
         Args:
+            `type` (str): Vehicle type ID
             `vehicle_ids` (list, tuple, str): Vehicle ID or list of IDs
             `colour` (str, (int)): Sets vehicle colour
             `highlight` (bool): Highlights the vehicle with a circle (bool)
@@ -2636,6 +2637,12 @@ class Simulation:
                 if error != None: raise_error(error, desc, self.curr_step)
 
                 match command:
+                    case "type":
+                        if not self.vehicle_type_exists(value):
+                            desc = f"Vehicle type ID '{value}' not found."
+                            raise_error(KeyError, desc, self.curr_step)
+                        traci.vehicle.setType(vehicle_id, value)
+                        
                     case "colour":
                         if value != None:
                             colour = value

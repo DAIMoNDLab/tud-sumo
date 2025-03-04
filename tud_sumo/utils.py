@@ -23,7 +23,7 @@ valid_data_keys = { "detector": {
                         "lsm_occupancy": tc.LAST_STEP_OCCUPANCY
                     },
                     "vehicle": {
-                        "type":          {"getter": True,  "setter": False, "tc": None},
+                        "type":          {"getter": True,  "setter": True, "tc": None},
                         "colour":        {"getter": False, "setter": True,  "tc": None},
                         "length":        {"getter": True,  "setter": False, "tc": None},
                         "highlight":     {"getter": False, "setter": True,  "tc": None},
