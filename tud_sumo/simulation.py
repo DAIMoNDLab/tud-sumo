@@ -4272,21 +4272,18 @@ class TrackedJunction:
 
                 if self.ramp_edges != None:
                     queuing_vehicles = self.sim.get_last_step_geometry_vehicles(self.ramp_edges, flatten=True)
-                    self.queue_lengths.append(len(queuing_vehicles))
-
-                    num_stopped = len([veh_id for veh_id in queuing_vehicles if self.sim.get_vehicle_vals(veh_id, "is_stopped")])
-                    self.queue_delays.append(num_stopped * self.sim.step_length)
                 
                 elif self.queue_detector != None:
                     queuing_vehicles = self.sim.get_last_step_detector_vehicles(self.queue_detector, flatten=True)
-                    self.queue_lengths.append(len(queuing_vehicles))
-
-                    num_stopped = len([veh_id for veh_id in queuing_vehicles if self.sim.get_vehicle_vals(veh_id, "is_stopped")])
-                    self.queue_delays.append(num_stopped * self.sim.step_length)
 
                 else:
                     desc = "Cannot update meter '{0}' queue length (no detector or entry/exit edges)".format(self.id)
                     raise_error(KeyError, desc, self.sim.curr_step)
+
+                self.queue_lengths.append(len(queuing_vehicles))
+                queuing_vehicles = [veh_id for veh_id in queuing_vehicles if self.sim.vehicle_exists(veh_id)]
+                num_stopped = len([veh_id for veh_id in queuing_vehicles if self.sim.get_vehicle_vals(veh_id, "is_stopped")])
+                self.queue_delays.append(num_stopped * self.sim.step_length)
 
             if self.measure_spillback:
                 spillback_vehs, all_waiting_vehs = 0, 0
