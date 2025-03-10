@@ -2642,6 +2642,10 @@ class Simulation:
                             desc = f"Vehicle type ID '{value}' not found."
                             raise_error(KeyError, desc, self.curr_step)
                         traci.vehicle.setType(vehicle_id, value)
+                        if vehicle_id not in self._known_vehicles: self._known_vehicles[vehicle_id] = {}
+                        self._known_vehicles[vehicle_id]["type"] = value
+                        if "length" in self._known_vehicles[vehicle_id]:
+                            self._known_vehicles[vehicle_id]["length"] = self.get_vehicle_vals(vehicle_id, "length")
                         
                     case "colour":
                         if value != None:
@@ -3238,12 +3242,13 @@ class Simulation:
 
         return all_data_vals
     
-    def get_vehicle_data(self, vehicle_ids: str|list|tuple) -> dict|None:
+    def get_vehicle_data(self, vehicle_ids: str|list|tuple, refresh: bool = False) -> dict|None:
         """
         Get data for specified vehicle(s).
         
         Args:
             `vehicle_ids` (str, list, tuple): Vehicle ID or list of IDs
+            `refresh` (bool): Denotes whether to update static vehicle data
         
         Returns:
             (dict, optional):Vehicle data dictionary, returns None if does not exist in simulation
@@ -3266,7 +3271,7 @@ class Simulation:
             elif len(set(static_data_keys) - set(self._known_vehicles[vehicle_id].keys())) > 0: new_vehicle = True
             else: new_vehicle = False
 
-            if new_vehicle:
+            if new_vehicle or refresh:
                 static_veh_data = self.get_vehicle_vals(vehicle_id, static_data_keys)
 
                 # Maintain _known_vehicles dictionary to not repeatedly need to fetch static data
