@@ -77,6 +77,7 @@ class Simulation:
                                      "vehicle_type", "departure", "origin", "destination"] 
         
         self._default_view = 'View #0'
+        self._gui_veh_tracking = {}
         self._recorder = None
 
     def __str__(self):
@@ -1108,16 +1109,21 @@ class Simulation:
             recording_ids = self._recorder.get_recordings()
             for recording_id in recording_ids:
                 recording_data = self._recorder.get_recording_data(recording_id)
+                
+                frame_file = f"{recording_data['frames_loc']}/f_{len(recording_data['frame_files'])+1}.png"
+                self.take_screenshot(filename=frame_file, view_id=recording_data["view_id"], bounds=recording_data["bounds"], zoom=recording_data["zoom"])
+                recording_data["frame_files"].append(frame_file)
+
+        # Step through simulation
+        traci.simulationStep()
+
+        if self._recorder != None:
+            recording_ids = self._recorder.get_recordings()
+            for recording_id in recording_ids:
+                recording_data = self._recorder.get_recording_data(recording_id)
                 if "vehicle_id" in recording_data and recording_data["vehicle_id"] not in self._all_curr_vehicle_ids:
                     self._recorder.save_recording(recording_id)
                     continue
-                
-                frame_file = f"{recording_data['frames_loc']}/f_{self.curr_step-recording_data['start_step']}.png"
-                self.take_screenshot(recording_data["view_id"], frame_file, recording_data["bounds"], recording_data["zoom"])
-                recording_data["frame_files"].append(frame_file)
-        
-        # Step through simulation
-        traci.simulationStep()
 
         # Update all vehicle ID lists
         all_prev_vehicle_ids = self._all_curr_vehicle_ids
@@ -1252,6 +1258,19 @@ class Simulation:
             raise_error(SimulationError, desc, self.curr_step)
         return self._all_data["data"]["vehicles"]["tts"][-1]
     
+    def get_twt(self) -> int:
+        """
+        Returns the total waiting time of vehicles in the simulation during the last simulation step.
+        
+        Returns:
+            float: Total Waiting Time (TWT) in seconds
+        """
+        
+        if self._all_data == None:
+            desc = "No data to return (simulation likely has not been run, or data has been reset)."
+            raise_error(SimulationError, desc, self.curr_step)
+        return self._all_data["data"]["vehicles"]["twt"][-1]
+    
     def get_delay(self) -> int:
         """
         Returns the total delay of vehicles during the last simulation step.
@@ -1265,11 +1284,25 @@ class Simulation:
             raise_error(SimulationError, desc, self.curr_step)
         return self._all_data["data"]["vehicles"]["delay"][-1]
     
+    def get_to_depart(self) -> int:
+        """
+        Returns the total number of vehicles waiting to enter the simulation during the last simulation step.
+        
+        Returns:
+            float: No. of vehicles waiting to depart
+        """
+        
+        if self._all_data == None:
+            desc = "No data to return (simulation likely has not been run, or data has been reset)."
+            raise_error(SimulationError, desc, self.curr_step)
+        return self._all_data["data"]["vehicles"]["to_depart"][-1]
+    
     def get_interval_network_data(self, data_keys: list|tuple, n_steps: int, interval_end: int = 0, get_avg: bool=False) -> float|dict:
         """
         Returns network-wide vehicle data in the simulation during range (`curr step - n_step - interval_end -> curr_step - interval_end`).
-        Valid data keys are; '_tts_', '_delay_', '_no_vehicles_' and '_no_waiting_'. By default, all values are totalled throughout the interval
-        unless `get_avg == True`. If multiple data keys are given, the resulting data is returned in a dictionary by each key.
+        Valid data keys are; '_tts_', '_twt_', '_delay_', '_no_vehicles_', '_no_waiting_' and '_to_depart_'. By default, all values are
+        totalled throughout the interval unless `get_avg == True`. If multiple data keys are given, the resulting data is returned in a
+        dictionary by each key.
         
         Args:
             `data_keys` (str, list): Data key or list of keys
@@ -1299,7 +1332,7 @@ class Simulation:
         all_data = {}
         for data_key in data_keys:
 
-            valid_keys = ["tts", "delay", "no_vehicles", "no_waiting"]
+            valid_keys = ["tts", "twt", "delay", "no_vehicles", "no_waiting", "to_depart"]
             error, desc = test_valid_string(data_key, valid_keys, "data key")
             if error != None: raise_error(error, desc)
 
@@ -3391,8 +3424,7 @@ class Simulation:
         '_curr_travel_time_', '_ff_travel_time_', '_emissions_', '_length_', '_max_speed_'
         
         **Edge only**:
-        '_connected_edges_', '_incoming_edges_', '_outgoing_edges_', '_street_name_', '_n_lanes_', '_lane_ids_', '_junction_ids_',
-        '_linestring_'
+        '_connected_edges_', '_incoming_edges_', '_outgoing_edges_', '_street_name_', '_n_lanes_', '_lane_ids_', '_junction_ids_'
         
         **Lane only**: 
         '_edge_id_', '_n_links_', '_allowed_', '_disallowed_', '_left_lc_', '_right_lc_'.
@@ -3845,11 +3877,11 @@ class Simulation:
 
         Args:
             `vehicle_id` (str): Vehicle ID
-            `view_id` (str, optional):View ID, if `None` uses default
+            `view_id` (str, optional): View ID, if `None` uses default
         """
         
         if not self._gui:
-            desc = f"Cannot track vehicle '{vehicle_id}' (GUI is not active)."
+            desc = f"Cannot take screenshot (GUI is not active)."
             raise_error(SimulationError, desc, self.curr_step)
 
         if not self.vehicle_exists(vehicle_id):
@@ -3861,19 +3893,24 @@ class Simulation:
 
         traci.gui.trackVehicle(view_id, vehicle_id)
 
-    def gui_stop_tracking(self, view_id: str) -> None:
+        self._gui_veh_tracking[view_id] = vehicle_id
+
+    def gui_stop_tracking(self, view_id: str|None) -> None:
         """
         Stops GUI view from tracking vehicle.
 
         Args:
-            `view_id` (str): View ID
+            `view_id` (str, optional): View ID (defaults to default view)
         """
 
-        if not self._gui:
-            desc = f"GUI is not active."
-            raise_error(SimulationError, desc, self.curr_step)
-
         if view_id == None: view_id = self._default_view
+
+        if not self._gui:
+            desc = f"Cannot stop vehicle tracking (GUI is not active)."
+            raise_error(SimulationError, desc, self.curr_step)
+        elif view_id not in self._gui_veh_tracking:
+            desc = f"View ID '{view_id}' is not tracking a vehicle."
+            raise_error(KeyError, desc, self.curr_step)
 
         if not traci.gui.hasView(view_id):
             desc = f"View ID '{view_id}' not found."
@@ -3881,15 +3918,33 @@ class Simulation:
         
         traci.gui.trackVehicle(view_id, "")
 
-    def set_view(self, view_id: str, bounds: list|tuple|None = None, zoom: int|float|None = None) -> None:
+        del self._gui_veh_tracking[view_id]
+
+    def gui_is_tracking(self, view_id: str|None = None) -> bool:
+        """
+        Returns whether a GUI view is tracking a vehicle.
+
+        Args:
+            `view_id` (str, optional): View ID (defaults to default view)
+        """
+        
+        return view_id in self._gui_veh_tracking
+
+    def set_view(self, view_id: str|None = None, bounds: list|tuple|None = None, zoom: int|float|None = None) -> None:
         """
         Sets the bounds and/or zoom level of a GUI view.
 
         Args:
-            `view_id` (str): View ID
+            `view_id` (str, optional): View ID (defaults to default view)
             `bounds` (list, tuple, optional): View bounds coordinates (lower-left, upper-right)
             `zoom` (int, float, optional): Zoom level
         """
+
+        if not self._gui:
+            desc = f"Cannot set view (GUI is not active)."
+            raise_error(SimulationError, desc, self.curr_step)
+
+        if view_id == None: view_id = self._default_view
 
         if bounds == None and zoom == None:
             desc = "Invalid bounds and zoom (both cannot be 'None')."
@@ -3900,22 +3955,26 @@ class Simulation:
             traci.gui.setBoundary(view_id, bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1])
         if zoom != None: traci.gui.setZoom(view_id, zoom)
 
-    def take_screenshot(self, view_id: str, filename: str, bounds: list|tuple|None = None, zoom: int|float|None = None) -> None:
+    def take_screenshot(self, filename: str, view_id: str|None = None, bounds: list|tuple|None = None, zoom: int|float|None = None) -> None:
         """
         Takes a screenshot of a GUI view and saves result to a file.
 
         Args:
-            `view_id` (str): View ID
             `filename` (str): Screenshot filename
-            `bounds` (list, tuple, optional):View bounds coordinates (lower-left, upper-right) (defaults to current bounds)
-            `zoom` (int, float, optional):Zoom level (defaults to current zoom)
+            `view_id` (str, optional): View ID (defaults to default view)
+            `bounds` (list, tuple, optional): View bounds coordinates (lower-left, upper-right) (defaults to current bounds)
+            `zoom` (int, float, optional): Zoom level (defaults to current zoom)
         """
 
         if not self._gui:
             desc = f"Cannot take screenshot (GUI is not active)."
             raise_error(SimulationError, desc, self.curr_step)
 
+        if view_id == None: view_id = self._default_view
+
         if bounds != None or zoom != None: self.set_view(view_id, bounds, zoom)
+
+        if not filename.endswith(".png"): filename += ".png"
 
         traci.gui.screenshot(view_id, filename)
 
