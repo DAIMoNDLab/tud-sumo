@@ -14,11 +14,12 @@ from .utils import *
 class Simulation:
     """ Main simulation interface."""
 
-    def __init__(self, scenario_name: str|None = None, scenario_desc: str|None = None) -> None:
+    def __init__(self, scenario_name: str|None = None, scenario_desc: str|None = None, verbose: bool = True) -> None:
         """
         Args:
             `scenario_name` (str, optional):Scenario label saved to simulation object (defaults to name of '_.sumocfg_')
             `scenario_desc` (str, optional):Simulation scenario description, saved along with all files
+            `verbose` (bool): Denotes whether to print simulation information
         """
 
         self.curr_step = 0
@@ -28,6 +29,8 @@ class Simulation:
         
         self.scenario_name = validate_type(scenario_name, (str, type(None)), "scenario_name")
         self.scenario_desc = validate_type(scenario_desc, (str, type(None)), "scenario_desc")
+
+        self._verbose = verbose
         
         self._seed = None
         self._running = False
@@ -77,6 +80,7 @@ class Simulation:
                                      "vehicle_type", "departure", "origin", "destination"] 
         
         self._default_view = 'View #0'
+        self._gui_views = []
         self._gui_veh_tracking = {}
         self._recorder = None
 
@@ -282,8 +286,12 @@ class Simulation:
         self._get_individual_vehicle_data = get_individual_vehicle_data
         self._automatic_subscriptions = automatic_subscriptions
 
-        self._suppress_warnings = suppress_warnings
-        self._suppress_pbar = suppress_pbar
+        if self._verbose:
+            self._suppress_warnings = suppress_warnings
+            self._suppress_pbar = suppress_pbar
+        else:
+            self._suppress_warnings = True
+            self._suppress_pbar = True
 
         self._sim_start_time = get_time_str()
 
@@ -291,8 +299,9 @@ class Simulation:
             if self.scenario_name == None: _name = "Simulation"
             else: _name = "'{0}' Scenario".format(self.scenario_name)
 
-            print("Running {0}".format(_name))
-            print("  - Start time: {0}".format(self._sim_start_time))
+            if self._verbose:
+                print("Running {0}".format(_name))
+                print("  - Start time: {0}".format(self._sim_start_time))
 
     def save_objects(self, filename: str|None = None, overwrite: bool = True, json_indent: int|None = 4) -> None:
         """
@@ -3912,7 +3921,7 @@ class Simulation:
             desc = f"View ID '{view_id}' is not tracking a vehicle."
             raise_error(KeyError, desc, self.curr_step)
 
-        if not traci.gui.hasView(view_id):
+        if view_id not in self.get_gui_views():
             desc = f"View ID '{view_id}' not found."
             raise_error(KeyError, desc, self.curr_step)
         
@@ -3929,7 +3938,101 @@ class Simulation:
         """
         
         return view_id in self._gui_veh_tracking
+    
+    def add_gui_view(self, view_id: str, bounds: list|tuple|None = None, zoom: int|float|None = None) -> None:
+        """
+        Adds a new GUI view.
+        
+        Args:
+            `view_id` (str): View ID
+            `bounds` (list, tuple, optional): View bounds coordinates (lower-left, upper-right)
+            `zoom` (int, float, optional): Zoom level
+        """
 
+        if view_id in self.get_gui_views():
+            desc = f"View ID '{view_id}' already exists."
+            raise_error(KeyError, desc, self.curr_step)
+        
+        traci.gui.addView(view_id)
+        
+        if bounds != None or zoom != None: self.set_view(view_id, bounds, zoom)
+        self._gui_views.append(view_id)
+
+    def remove_gui_view(self, view_id: str) -> None:
+        """
+        Removes a GUI view.
+        
+        Args:
+            `view_id` (str): View ID
+        """
+
+        if view_id not in self.get_gui_views():
+            desc = f"View ID '{view_id}' not found."
+            raise_error(KeyError, desc, self.curr_step)
+
+        elif view_id == self._default_view:
+            desc = f"Cannot remove default view '{view_id}'."
+            raise_error(ValueError, desc, self.curr_step)
+
+        traci.gui.removeView(view_id)
+        self._gui_views.remove(view_id)
+
+    def get_gui_views(self) -> list:
+        """
+        Returns a list of all GUI view IDs.
+        
+        Returns:
+            list: List of view IDs
+        """
+
+        return [self._default_view] + self._gui_views
+    
+    def get_view_boundaries(self, view_id: str|None = None) -> tuple:
+        """
+        Returns the boundaries of a view (defaults to default view).
+
+        Args:
+            `view_id` (str, optional): View ID (defaults to default view)
+
+        Returns:
+            tuple: View boundaries (lower-left, upper-right)
+        """
+
+        if not self._gui:
+            desc = f"Cannot get view boundaries (GUI is not active)."
+            raise_error(SimulationError, desc, self.curr_step)
+
+        if view_id == None: view_id = self._default_view
+
+        elif view_id not in self.get_gui_views():
+            desc = f"View ID '{view_id}' not found."
+            raise_error(KeyError, desc, self.curr_step)
+
+        return traci.gui.getBoundary(view_id)
+    
+    def get_view_zoom(self, view_id: str|None = None) -> int:
+        """
+        Returns the zoom level of a view (defaults to default view).
+
+        Args:
+            `view_id` (str, optional): View ID (defaults to default view)
+
+        Returns:
+            int: Zoom level percent
+        """
+
+        if not self._gui:
+            desc = f"Cannot get view boundaries (GUI is not active)."
+            raise_error(SimulationError, desc, self.curr_step)
+
+        if view_id == None: view_id = self._default_view
+
+        elif view_id not in self.get_gui_views():
+            desc = f"View ID '{view_id}' not found."
+            raise_error(KeyError, desc, self.curr_step)
+
+        return traci.gui.getZoom(view_id)
+    
     def set_view(self, view_id: str|None = None, bounds: list|tuple|None = None, zoom: int|float|None = None) -> None:
         """
         Sets the bounds and/or zoom level of a GUI view.
