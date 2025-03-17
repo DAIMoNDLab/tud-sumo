@@ -2397,10 +2397,10 @@ class MultiPlotter(_GenericPlotter):
             sim_data = self.sim_datasets[sim_id]
 
             if detector_id not in sim_data["data"]["detectors"].keys():
-                desc = "Detector ID '{0}' not found in Simulation '{1}'.".format(detector_id, self.sim_labels[sim_id])
+                desc = f"(Simulation '{self.sim_labels[sim_id]}') Detector ID '{detector_id}' not found."
                 raise_error(KeyError, desc)
             elif data_key == "occupancies" and sim_data["data"]["detectors"][detector_id]["type"] == "multientryexit":
-                desc = "Multi-Entry-Exit Detectors ('{0}') do not measure '{1}'.".format(detector_id, data_key)
+                desc = f"(Simulation '{self.sim_labels[sim_id]}') Multi-Entry-Exit Detectors ('{detector_id}') do not measure '{data_key}'."
                 raise_error(ValueError, desc)
 
             start, step = sim_data["start"], sim_data["step_len"]
@@ -2475,10 +2475,10 @@ class MultiPlotter(_GenericPlotter):
             sim_data = self.sim_datasets[sim_id]
 
             if "edges" not in sim_data["data"].keys():
-                desc = "No TrackedEdge data found."
+                desc = f"(Simulation '{self.sim_labels[sim_id]}') No TrackedEdge data found."
                 raise_error(KeyError, desc)
             elif edge_id not in sim_data["data"]["edges"].keys():
-                desc = "Edge ID '{0}' not found in Simulation '{1}'.".format(edge_id, self.sim_labels[sim_id])
+                desc = f"(Simulation '{self.sim_labels[sim_id]}') Edge ID '{edge_id}' not found."
                 raise_error(KeyError, desc)
 
             start, step = sim_data["start"], sim_data["step_len"]
@@ -2637,10 +2637,10 @@ class MultiPlotter(_GenericPlotter):
                     x_lim = [min(min(x_vals), x_lim[0]), max(max(x_vals), x_lim[1])]
 
                 else:
-                    desc = "Junction '{0}' is not tracked as a meter.".format(rm_id)
+                    desc = f"(Simulation '{self.sim_labels[sim_id]}') Junction '{rm_id}' is not tracked as a meter."
                     raise_error(ValueError, desc)
             else:
-                desc = "Junction '{0}' not found in tracked junctions.".format(rm_id)
+                desc = f"(Simulation '{self.sim_labels[sim_id]}') Junction '{rm_id}' not found in tracked junctions."
                 raise_error(KeyError, desc)
 
         plotted, max_y_val = self._plot_group_data(ax, all_group_data, plotted, max_y_val, plot_range)
@@ -2666,12 +2666,93 @@ class MultiPlotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
+    def plot_rm_queue_length(self, rm_id: str, plot_distribution: bool=True, plot_groups: list|tuple|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+        """
+        Plots a boxplot showing the distribution of average queue lengths for each simulation group.
+
+        Args:
+            `rm_id` (str): Ramp meter ID
+            `plot_distribution` (bool): Denotes whether to plot data distribution (boxplot) or not (barchart)
+            `plot_groups` (list, tuple, optional): List of dataset groups to plot (defaults to all)
+            `fig_title` (str, optional): If given, will overwrite default title
+            `save_fig` (str, optional): Output image filename, will show image if not given
+        """
+                
+        if len(self.sim_group_ids) == 0:
+            desc = "No data to plot (no groups added)."
+            raise_error(KeyError, desc)
+
+        if plot_groups == None: plot_groups = self.sim_group_ids
+        elif isinstance(plot_groups, (list, tuple)):
+            for group_id in plot_groups:
+                if group_id not in self.sim_group_ids:
+                    desc = f"Group '{group_id}' not found."
+                    raise_error(KeyError, desc)
+        else:
+            desc = f"Invalid plot_groups (must be 'list', not '{type(plot_groups).__name__}')."
+            raise_error(TypeError, desc)
+
+        all_data = {group_id: [] for group_id in plot_groups}
+        
+        for sim_id, group_id in self.sim_groups.items():
+            if group_id not in plot_groups: continue
+            sim_data = self.sim_datasets[sim_id]
+
+            if "junctions" not in sim_data["data"] or rm_id not in sim_data["data"]["junctions"]:
+                desc = f"(Simulation '{self.sim_labels[sim_id]}') Junction '{rm_id}' not found in tracked junctions."
+                raise_error(KeyError, desc)
+            elif "meter" not in sim_data["data"]["junctions"][rm_id]:
+                desc = f"(Simulation '{self.sim_labels[sim_id]}') Junction '{rm_id}' is not tracked as a meter."
+                raise_error(ValueError, desc)
+            elif "queue_lengths" not in sim_data["data"]["junctions"][rm_id]["meter"]:
+                desc = f"(Simulation '{self.sim_labels[sim_id]}') No queue length data found for ramp meter '{rm_id}'."
+                raise_error(KeyError, desc)
+        
+            sim_val = sum(sim_data["data"]["junctions"][rm_id]["meter"]["queue_lengths"]) / len(sim_data["data"]["junctions"][rm_id]["meter"]["queue_lengths"])
+            all_data[group_id].append(sim_val)
+
+        fig, ax = plt.subplots(1, 1)
+        plt_data = [all_data[group_id] for group_id in plot_groups]
+
+        if plot_distribution:
+            bplot = ax.boxplot(plt_data, patch_artist=True)
+
+            ax.set_xticklabels(plot_groups, rotation=45)
+
+            for idx, (patch, flier) in enumerate(zip(bplot["boxes"], bplot['fliers'])):
+                colour, _ = self._get_colour("WHEEL", idx == 0)
+                patch.set(linewidth=0, facecolor=colour)
+                flier.set_markeredgecolor(colour)
+
+            for median in bplot["medians"]:
+                median.set(color='white', linewidth=1)
+        
+        else:
+            plt_data, colours = [sum(vals) / len(vals) for vals in plt_data], []
+            for idx in range(len(plt_data)):
+                colour, _ = self._get_colour("WHEEL", idx == 0)
+                colours.append(colour)
+            
+            ax.bar(plot_groups, plt_data, color=colours, zorder=3, label=plot_groups)
+            ax.tick_params(axis='x', labelrotation=45)
+
+        ax.set_ylabel(self._default_labels["vehicle_counts"])
+        fig_title = f"{self.scenario_label}'{rm_id}' Average Queue Length" if not isinstance(fig_title, str) else fig_title
+        if fig_title != "": ax.set_title(fig_title, pad=20)
+        
+        self._add_grid(ax, None)
+
+        fig.tight_layout()
+        
+        self._display_figure(save_fig)
+
     def plot_statistics(self, data_key: str, plot_distribution: bool=True, plot_groups: list|tuple|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
         """
         Plots a boxplot showing the distribution of network-wide vehicle statistics (TTS/TWT/cumulative delay) for each simulation group.
 
         Args:
             `data_key` (str): Either '_tts_', '_twt_' or '_delay_'
+            `plot_distribution` (bool): Denotes whether to plot data distribution (boxplot) or not (barchart)
             `plot_groups` (list, tuple, optional): List of dataset groups to plot (defaults to all)
             `fig_title` (str, optional): If given, will overwrite default title
             `save_fig` (str, optional): Output image filename, will show image if not given
