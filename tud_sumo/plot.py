@@ -1888,7 +1888,7 @@ class Plotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_fundamental_diagram(self, edge_ids: list|tuple|str|None=None, x_axis: str="density", y_axis: str="flow", x_percentile: int=100, y_percentile: int=100, aggregation_steps: int=0, separate_edges: bool=False, point_size: int=3, time_range: list|tuple|None=None, plt_colour: str|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_fundamental_diagram(self, edge_ids: list|tuple|str|None=None, x_axis: str="density", y_axis: str="flow", x_percentile: int=100, y_percentile: int=100, lr_degree: int|None=None, aggregation_steps: int=0, separate_edges: bool=False, point_size: int=3, time_range: list|tuple|None=None, plt_colour: str|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
         """
         Plot a fundamental diagram from tracked egde data.
         
@@ -1898,6 +1898,7 @@ class Plotter(_GenericPlotter):
             `y_axis` (str): y-axis variable ('_s_'|'_f_'|'_d_'|'_speed_'|'_flow_'|'_density_')
             `x_percentile` (int): x-axis value plotting percentile [1-100]
             `y_percentile` (int): y-axis value plotting percentile [1-100]
+            `lr_degree` (int, optional): Degree of linear regression (LR) model (if given, regression line and R^2 value plotted)
             `aggregation_steps` (int): If given, values are aggregated using this interval
             `separate_edges` (bool): If True, individual edges are plotted with separate colours
             `point_size` (int): Scatter graph point size
@@ -1956,6 +1957,7 @@ class Plotter(_GenericPlotter):
         plotted = False
         max_x, max_y = -math.inf, -math.inf
         x_points, y_points = [], []
+        all_x, all_y = [], []
         for idx, edge_id in enumerate(edge_ids):
 
             x_vals = all_edge_data[edge_id][data_labels[x_axis]]
@@ -2004,14 +2006,39 @@ class Plotter(_GenericPlotter):
             if separate_edges:
                 colour, _ = self._get_colour("WHEEL", idx==0)
                 ax.scatter(x_points, y_points, s=point_size, color=colour, label=edge_id if separate_edges else None, zorder=2)
+                all_x += x_points
+                all_y += y_points
                 x_points, y_points, plotted = [], [], True
 
         if not separate_edges and len(x_vals) > 0 and len(y_vals) > 0:
             ax.scatter(x_points, y_points, s=point_size, color=self._get_colour(plt_colour), zorder=2)
+            all_x, all_y = x_points, y_points
 
         elif not plotted:
             desc = "No data to plot (no vehicles found on tracked edges during time period)."
             raise_error(KeyError, desc)
+
+        if lr_degree != None:
+            model = np.poly1d(np.polyfit(all_x, all_y, lr_degree))
+            x_vals = np.linspace(min(all_x), max(all_x), 100)
+            y_vals = model(x_vals)
+            ax.plot(x_vals, y_vals, color='green')
+
+            r_2 = round(_get_r2(all_x, all_y, lr_degree), 5)
+            stats = f"$R^2 = {r_2}$"
+
+            if lr_degree > 1:
+                lr_max_y, lr_max_x = max(y_vals), x_vals[list(y_vals).index(max(y_vals))]
+                ax.plot([0, lr_max_x], [lr_max_y, lr_max_y], color='darkgrey', linestyle='--', zorder=12)
+                ax.plot([lr_max_x, lr_max_x], [0, lr_max_y], color='darkgrey', linestyle='--', zorder=12)
+                ax.scatter([lr_max_x], [lr_max_y], marker='o', color='darkgrey', s=point_size*5, zorder=12)
+
+                stats += f"\n$Max: ({round(lr_max_x, 1)}, {round(lr_max_y, 1)})$"
+
+            buffer = 0.02
+            ax.text(get_axis_lim(max_x) * (1 - buffer), get_axis_lim(max_y) * (1 - buffer), stats,
+                    zorder=20, horizontalalignment='right', verticalalignment='top', color='black',
+                    bbox=dict(facecolor='white', alpha=0.6, linewidth=0))
 
         dist = "mi" if self.units == "IMPERIAL" else "km"
         sp = "mph" if self.units == "IMPERIAL" else "kmph"
@@ -2778,3 +2805,11 @@ def _get_throughput_x_y(sim_data: dict, time_unit: str, od_pair: list|tuple|None
     y_vals = [val / agg_time for val in y_vals]
 
     return x_vals, y_vals
+
+def _get_r2(x_vals, y_vals, degree):
+    coeffs = np.polyfit(x_vals, y_vals, degree)
+    p = np.poly1d(coeffs)
+    y_avg = np.sum(y_vals)/len(y_vals)
+    ssreg = np.sum((p(x_vals) - y_avg)**2)
+    sstot = np.sum((y_vals - y_avg)**2)
+    return 1 - (((1 - (ssreg / sstot)) * (len(y_vals)-1)) / (len(y_vals) - degree - 1))
