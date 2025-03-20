@@ -1715,7 +1715,7 @@ class Plotter(_GenericPlotter):
                 if not isinstance(dist_label, (list, tuple)) or len(dist_label) != 2:
                     desc = f"Invalid dist_label '{dist_label}' (must be length 2: [str, (int, float)])."
                     raise_error(TypeError, desc)
-                elif not isinstance(dist_label[0], str) or not isinstance(dist_label[1], (int, float)):
+                elif not isinstance(dist_label[0], (str, type(None))) or not isinstance(dist_label[1], (int, float)):
                     desc = f"Invalid dist_label '{dist_label}' (must be type [str, (int, float)])."
                     raise_error(TypeError, desc)
 
@@ -1724,9 +1724,10 @@ class Plotter(_GenericPlotter):
                 
                 ax.plot([min(x_vals), max(x_vals)], [dist, dist], linestyle='--', color='black', linewidth=1.5, zorder=10)
                 padding = (max(x_vals) - min(x_vals)) * 0.02
-                ax.text(padding + min(x_vals), dist, label, fontsize=6,
-                        zorder=20, horizontalalignment='left', verticalalignment='center', color='red',
-                        bbox=dict(facecolor='white', alpha=0.9, linewidth=0))
+                if label != "" and label != None:
+                    ax.text(padding + min(x_vals), dist, label, fontsize=6,
+                            zorder=20, horizontalalignment='left', verticalalignment='center', color='red',
+                            bbox=dict(facecolor='white', alpha=0.9, linewidth=0))
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.1)
