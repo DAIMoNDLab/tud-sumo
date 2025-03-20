@@ -1622,13 +1622,14 @@ class Plotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_space_time_diagram(self, edge_ids: list|tuple, upstream_at_top: bool=True, time_range: list|tuple|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_space_time_diagram(self, edge_ids: list|tuple, upstream_at_top: bool=True, dist_labels: list|tuple|None=None, time_range: list|tuple|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
         """
         Plot space time data from tracked edge data.
         
         Args:
             `edge_ids` (list, tuple): Single tracked egde ID or list of IDs
             `upstream_at_top` (bool): If `True`, upstream values are displayed at the top of the diagram
+            `dist_labels` (list, tuple, optional): A list of labels and distances (km/mi) to be plotted on the graph (as a list of (str, [int|float]) pairs)
             `time_range` (list, tuple, optional): Plotting time range (in plotter class units)
             `fig_title` (str, optional): If given, will overwrite default title
             `save_fig` (str, optional): Output image filename, will show image if not given
@@ -1706,7 +1707,26 @@ class Plotter(_GenericPlotter):
                 desc = "No data to plot (no vehicles recorded during time frame '{0}-{1}{2}').".format(time_range[0], time_range[1], self.time_unit)
                 raise_error(ValueError, desc)
         
-        points = ax.scatter(x_vals, y_vals, c=speed_vals, s=0.5, cmap='hot')
+        points = ax.scatter(x_vals, y_vals, c=speed_vals, s=0.5, cmap='hot', zorder=1)
+
+        if dist_labels != None:
+            validate_list_types(dist_labels, (list, tuple), param_name='dist_labels')
+            for dist_label in dist_labels:
+                if not isinstance(dist_label, (list, tuple)) or len(dist_label) != 2:
+                    desc = f"Invalid dist_label '{dist_label}' (must be length 2: [str, (int, float)])."
+                    raise_error(TypeError, desc)
+                elif not isinstance(dist_label[0], str) or not isinstance(dist_label[1], (int, float)):
+                    desc = f"Invalid dist_label '{dist_label}' (must be type [str, (int, float)])."
+                    raise_error(TypeError, desc)
+
+                label, dist = dist_label
+                dist = convert_units(dist, orig_units, new_units)
+                
+                ax.plot([min(x_vals), max(x_vals)], [dist, dist], linestyle='--', color='black', linewidth=1.5, zorder=10)
+                padding = (max(x_vals) - min(x_vals)) * 0.02
+                ax.text(padding + min(x_vals), dist, label, fontsize=6,
+                        zorder=20, horizontalalignment='left', verticalalignment='center', color='red',
+                        bbox=dict(facecolor='white', alpha=0.9, linewidth=0))
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.1)
@@ -1729,7 +1749,7 @@ class Plotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_trajectories(self, edge_ids: str|list|tuple, lane_idx: int|None=None, vehicle_pct: float=1, rnd_seed: int|None=None, time_range: list|tuple|None=None, show_events: str|list|None=None, plt_colour: str|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_trajectories(self, edge_ids: str|list|tuple, lane_idx: int|None=None, vehicle_pct: float=1, rnd_seed: int|None=None, dist_labels: list|tuple|None=None, time_range: list|tuple|None=None, show_events: str|list|None=None, plt_colour: str|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
         """
         Plot vehicle trajectory data from tracked edge data.
         
@@ -1738,6 +1758,7 @@ class Plotter(_GenericPlotter):
             `lane_idx` (int, optional): Lane index for vehicles on all edges
             `vehicle_pct` (float): Percent of vehicles plotted (defaults to all)
             `rnd_seed` (int, optional): When `vehicle_pct < 1`, vehicles are selected randomly with `rnd_seed`
+            `dist_labels` (list, tuple, optional): A list of labels and distances (km/mi) to be plotted on the graph (as a list of (str, [int|float]) pairs)
             `time_range` (list, tuple, optional): Plotting time range (in plotter class units)
             `show_events` (str, list, optional): Event ID, list of IDs, '_all_', '_scheduled_', '_active_', '_completed_' or `None`
             `plt_colour` (str, optional): Line colour for plot (defaults to TUD 'cyaan')
@@ -1872,6 +1893,25 @@ class Plotter(_GenericPlotter):
 
         x_label, y_label = self._default_labels["sim_time"], self._default_labels[new_units]
 
+        if dist_labels != None:
+            validate_list_types(dist_labels, (list, tuple), param_name='dist_labels')
+            for dist_label in dist_labels:
+                if not isinstance(dist_label, (list, tuple)) or len(dist_label) != 2:
+                    desc = f"Invalid dist_label '{dist_label}' (must be length 2: [str, (int, float)])."
+                    raise_error(TypeError, desc)
+                elif not isinstance(dist_label[0], str) or not isinstance(dist_label[1], (int, float)):
+                    desc = f"Invalid dist_label '{dist_label}' (must be type [str, (int, float)])."
+                    raise_error(TypeError, desc)
+
+                label, dist = dist_label
+                dist = convert_units(dist, orig_units, new_units)
+                
+                ax.plot(x_lim, [dist, dist], linestyle='--', color='black', linewidth=1.5, zorder=10)
+                padding = (x_lim[1] - x_lim[0]) * 0.02
+                ax.text(padding + x_lim[0], dist, label, fontsize=6,
+                        zorder=20, horizontalalignment='left', verticalalignment='center', color='red',
+                        bbox=dict(facecolor='white', alpha=0.9, linewidth=0))
+                
         ax.set_xlim(x_lim)
         ax.set_ylim(y_lim)
         ax.set_xlabel(x_label)
