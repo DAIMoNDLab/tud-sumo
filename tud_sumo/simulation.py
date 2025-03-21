@@ -1,13 +1,13 @@
 import os, sys, io, traci, sumolib, json, csv, math, inspect, importlib.util
 import pickle as pkl
 import numpy as np
-from shutil import rmtree
 from tqdm import tqdm
 from copy import copy, deepcopy
 from random import choices, choice, random, seed as set_seed
 from .events import EventScheduler, Event
 from .controllers import VSLController, RGController
 from .videos import Recorder
+from .demand import DemandProfile
 from shapely.geometry import LineString, Point
 from .utils import *
 
@@ -48,10 +48,11 @@ class Simulation:
         self._all_tls = []
 
         self._manual_flow = False
-        self._demand_headers = None
-        self._demand_arrs = None
-        self._man_flow_id = None
+
         self._demand_files = []
+
+        self._demand_profiles = []
+        self._man_flow_id = 0
 
         self.controllers = {}
         self._scheduler = None
@@ -69,7 +70,8 @@ class Simulation:
         self._all_loaded_vehicle_ids = set([])
         self._all_added_vehicles = set([])
         self._all_removed_vehicles = set([])
-        self._all_vehicle_types = set([])
+        self._vehicle_types = set([])
+        self._added_vehicle_types = set([])
         self._known_vehicles = {}
         self._trips = {"incomplete": {}, "completed": {}}
 
@@ -144,11 +146,13 @@ class Simulation:
         
         if config_file != None:
             if config_file.endswith(".sumocfg"):
+                self._sumo_cfg = config_file
                 sumoCMD += ["-c", config_file]
             else:
                 desc = "Invalid config file extension."
                 raise_error(ValueError, desc)
         else:
+            self._sumo_cfg = None
             sumoCMD += ["-n", net_file]
             
         if route_file != None: sumoCMD += ["-r", route_file]
@@ -242,7 +246,7 @@ class Simulation:
         self._all_tls = list(traci.trafficlight.getIDList())
         self._all_edges = list(traci.edge.getIDList())
         self._all_lanes = list(traci.lane.getIDList())
-        self._all_vehicle_types = set(traci.vehicletype.getIDList())
+        self._vehicle_types = set(traci.vehicletype.getIDList())
 
         self._all_edges = [e_id for e_id in self._all_edges if not e_id.startswith(":")]
         self._all_lanes = [l_id for l_id in self._all_lanes if not l_id.startswith(":")]
@@ -337,9 +341,11 @@ class Simulation:
             events = self._scheduler.get_events()
             if len(events) > 0: object_params["events"] = {e.id: e._init_params for e in events}
 
-        if len(self._demand_files) > 0:
-            d_files = list(self._demand_files)
-            object_params["demand"] = d_files if len(d_files) > 1 else d_files[0]
+        if len(self._demand_profiles) > 0:
+            all_files = []
+            for dp in self._demand_profiles:
+                all_files += dp._demand_files
+            object_params["demand"] = all_files if len(all_files) > 1 else all_files[0]
 
         if len(self._new_routes) > 0:
             object_params["routes"] = self._new_routes
@@ -419,319 +425,142 @@ class Simulation:
 
         if "demand" in object_parameters:
 
+            dp = DemandProfile(self)
             if isinstance(object_parameters["demand"], list):
                 for csv_file in object_parameters["demand"]:
-                    self.load_demand(csv_file)
+                    dp.load_demand(csv_file)
 
-            else: self.load_demand(object_parameters["demand"])
+            else: dp.load_demand(object_parameters["demand"])
 
         if "routes" in object_parameters:
 
             for r_id, route in object_parameters["routes"].items():
                 self.add_route(route, r_id)
-    
-    def load_demand(self, csv_file: str) -> None:
-        """
-        Loads OD demand from a '_.csv_' file. The file must contain an 'origin/destination' or 'route_id' column(s), 'start_time/end_time' or 'start_step/end_step' columns(s) and a 'demand/number' column.
-        
-        Args:
-            `csv_file` (str): Demand file location
-        """
-
-        csv_file = validate_type(csv_file, str, "demand file", self.curr_step)
-        if csv_file.endswith(".csv"):
-            if os.path.exists(csv_file):
-                with open(csv_file, "r") as fp:
-
-                    valid_cols = ["origin", "destination", "route_id", "start_time", "end_time", "start_step", "end_step",
-                                  "demand", "number", "vehicle_types", "vehicle_type_dists", "initial_speed", "origin_lane", "origin_pos", "insertion_sd"]
-                    demand_idxs = {}
-                    reader = csv.reader(fp)
-                    for idx, row in enumerate(reader):
-
-                        # First, get index of (valid) columns to read data correctly and
-                        # store in demand_idxs dict
-                        if idx == 0:
-
-                            if len(set(row) - set(valid_cols)) != 0:
-                                desc = "Invalid demand file (unknown columns '{0}').".format("', '".join(list(set(row) - set(valid_cols))))
-                                raise_error(KeyError, desc, self.curr_step)
-
-                            if "route_id" in row: demand_idxs["route_id"] = row.index("route_id")
-                            elif "origin" in row and "destination" in row:
-                                demand_idxs["origin"] = row.index("origin")
-                                demand_idxs["destination"] = row.index("destination")
-                            else:
-                                desc = "Invalid demand file (no routing values, must contain 'route_id' or 'origin/destination')."
-                                raise_error(KeyError, desc, self.curr_step)
-                            
-                            if "start_time" in row and "end_time" in row:
-                                demand_idxs["start_time"] = row.index("start_time")
-                                demand_idxs["end_time"] = row.index("end_time")
-                            elif "start_step" in row and "end_step" in row:
-                                demand_idxs["start_step"] = row.index("start_step")
-                                demand_idxs["end_step"] = row.index("end_step")
-                            else:
-                                desc = "Invalid demand file (no time values, must contain 'start_time/end_time' or 'start_step/end_step')."
-                                raise_error(KeyError, desc, self.curr_step)
-
-                            if "demand" in row: demand_idxs["demand"] = row.index("demand")
-                            elif "number" in row: demand_idxs["number"] = row.index("number")
-                            else:
-                                desc = "Invalid demand file (no demand values, must contain 'demand/number')."
-                                raise_error(KeyError, desc, self.curr_step)
-
-                            if "vehicle_types" in row:
-                                demand_idxs["vehicle_types"] = row.index("vehicle_types")
-                            
-                            if "vehicle_type_dists" in row and "vehicle_types" in row:
-                                demand_idxs["vehicle_type_dists"] = row.index("vehicle_type_dists")
-
-                            if "initial_speed" in row:
-                                demand_idxs["initial_speed"] = row.index("initial_speed")
-
-                            if "origin_lane" in row:
-                                demand_idxs["origin_lane"] = row.index("origin_lane")
-
-                            if "origin_pos" in row:
-                                demand_idxs["origin_pos"] = row.index("origin_pos")
-
-                            if "insertion_sd" in row:
-                                demand_idxs["insertion_sd"] = row.index("insertion_sd")
-
-                        else:
-
-                            # Use demand_idx dict to get all demand data from the correct indices
-
-                            if "route_id" in demand_idxs: routing = row[demand_idxs["route_id"]]
-                            else: routing = (row[demand_idxs["origin"]], row[demand_idxs["destination"]])
-
-                            if "start_time" in demand_idxs: 
-                                step_range = (int(row[demand_idxs["start_time"]]) / self.step_length, int(row[demand_idxs["end_time"]]) / self.step_length)
-                            else: step_range = (int(row[demand_idxs["start_step"]]), int(row[demand_idxs["end_step"]]))
-
-                            step_range = [int(val) for val in step_range]
-
-                            # Convert to flow in vehicles/hour if using 'number'
-                            if "number" in demand_idxs: demand = int(row[demand_idxs["number"]]) / convert_units(step_range[1] - step_range[0], "steps", "hours", self.step_length)
-                            else: demand = float(row[demand_idxs["demand"]])
-
-                            if "vehicle_types" in demand_idxs:
-                                vehicle_types = row[demand_idxs["vehicle_types"]].split(",")
-                                if len(vehicle_types) == 1: vehicle_types = vehicle_types[0]
-                            else:
-                                # If vehicle types not defined, use SUMO default vehicle type - car
-                                vehicle_types = "DEFAULT_VEHTYPE"
-                                if "vehicle_type_dists" in demand_idxs:
-                                    desc = "vehicle_type_dists given without vehicle_types."
-                                    raise_error(ValueError, desc, self.curr_step)
-
-                            if isinstance(vehicle_types, (list, tuple)):
-                                if "vehicle_type_dists" in demand_idxs:
-                                    vehicle_type_dists = row[demand_idxs["vehicle_type_dists"]].split(",")
-                                    if len(vehicle_type_dists) != len(vehicle_types):
-                                        desc = "Invalid vehicle_type_dists '[{0}]' (must be same length as vehicle_types '{1}').".format(", ".join(vehicle_type_dists), len(vehicle_types))
-                                        raise_error(ValueError, desc, self.curr_step)
-                                    else: vehicle_type_dists = [float(val) for val in vehicle_type_dists]
-                                else: vehicle_type_dists = 1 if isinstance(vehicle_types, str) else [1]*len(vehicle_types)
-                            else:
-                                vehicle_type_dists = None
-
-                            if "initial_speed" in demand_idxs:
-                                initial_speed = row[demand_idxs["initial_speed"]]
-                                if initial_speed.isdigit(): initial_speed = float(initial_speed)
-                            else: initial_speed = "max"
-
-                            if "origin_lane" in demand_idxs:
-                                origin_lane = row[demand_idxs["origin_lane"]]
-                                if origin_lane.isdigit(): origin_lane = int(origin_lane)
-                            else: origin_lane = "best"
-
-                            if "origin_pos" in demand_idxs:
-                                origin_pos = row[demand_idxs["origin_pos"]]
-                            else: origin_pos = "base"
-
-                            if "insertion_sd" in demand_idxs:
-                                insertion_sd = float(row[demand_idxs["insertion_sd"]])
-                            else: insertion_sd = 1/3
-
-                            self.add_demand(routing, step_range, demand, vehicle_types, vehicle_type_dists, initial_speed, origin_lane, origin_pos, insertion_sd)
-                            
-            else:
-                desc = "Demand file '{0}' not found.".format(csv_file)
-                raise_error(FileNotFoundError, desc, self.curr_step)
-        else:
-            desc = "Invalid demand file '{0}' format (must be '.csv').".format(csv_file)
-            raise_error(ValueError, desc, self.curr_step)
-
-        self._manual_flow = True
-        self._demand_files.append(csv_file)
-
-    def add_demand(self, routing: str|list|tuple, step_range: list|tuple, demand: int|float, vehicle_types: str|list|tuple|None = None, vehicle_type_dists: list|tuple|None = None, initial_speed: str|int|float = "max", origin_lane: str|int|float = "best", origin_pos: str|int = "base", insertion_sd: float = 1/3):
-        """
-        Adds traffic flow demand for a specific route and time.
-        
-        Args:
-            `routing` (str, list, tuple): Either a route ID or OD pair of edge IDs
-            `step_range` (str, list, tuple): (2x1) list or tuple denoting the start and end steps of the demand
-            `demand` (int, float): Generated flow in vehicles/hour
-            `vehicle_types` (str, list, tuple, optional):List of vehicle type IDs
-            `vehicle_type_dists` (list, tuple, optional):Vehicle type distributions used when generating flow
-            `initial_speed` (str, int, float): Initial speed at insertion, either ['_max_'|'_random_'] or number > 0
-            `origin_lane` (str, int): Lane for insertion at origin, either ['_random_'|'_free_'|'_allowed_'|'_best_'|'_first_'] or lane index
-            `origin_pos` (str, int): Longitudinal position at insertion, either ['_random_'|'_free_'|'_random\_free_'|'_base_'|'_last_'|'_stop_'|'_splitFront_'] or offset
-            `insertion_sd` (float): Vehicle insertion number standard deviation, at each step
-        """
-
-        routing = validate_type(routing, (str, list, tuple), "routing", self.curr_step)
-        if isinstance(routing, str) and not self.route_exists(routing):
-            desc = "Unknown route ID '{0}'.".format(routing)
-            raise_error(KeyError, desc, self.curr_step)
-        elif isinstance(routing, (list, tuple)):
-            routing = validate_list_types(routing, (str, str), True, "routing", self.curr_step)
-            if not self.is_valid_path(routing):
-                desc = "No route between edges '{0}' and '{1}'.".format(routing[0], routing[1])
-                raise_error(ValueError, desc, self.curr_step)
-
-        step_range = validate_list_types(step_range, ((int), (int)), True, "step_range", self.curr_step)
-        if step_range[1] < step_range[0] or step_range[1] < self.curr_step:
-            desc = "Invalid step_range '{0}' (must be valid range and end > current step)."
-            raise_error(ValueError, desc, self.curr_step)
-
-        if vehicle_types != None:
-            vehicle_types = validate_type(vehicle_types, (str, list, tuple), param_name="vehicle_types", curr_sim_step=self.curr_step)
-            if isinstance(vehicle_types, (list, tuple)):
-                vehicle_types = validate_list_types(vehicle_types, str, param_name="vehicle_types", curr_sim_step=self.curr_step)
-                for type_id in vehicle_types:
-                    if not self.vehicle_type_exists(type_id):
-                        desc = "Unknown vehicle type ID '{0}' in vehicle_types.".format(type_id)
-                        raise_error(KeyError, desc, self.curr_step)
-            elif not self.vehicle_type_exists(vehicle_types):
-                desc = "Unknown vehicle_types ID '{0}' given.".format(vehicle_types)
-                raise_error(KeyError, desc, self.curr_step)
-        else: vehicle_types = "DEFAULT_VEHTYPE"
-        
-        if vehicle_type_dists != None and vehicle_types == None:
-            desc = "vehicle_type_dists given, but no vehicle types."
-            raise_error(ValueError, desc, self.curr_step)
-        elif vehicle_type_dists != None and isinstance(vehicle_types, str):
-            desc = "Invalid vehicle_type_dists (vehicle_types is a single type ID, so no distribution)."
-            raise_error(ValueError, desc, self.curr_step)
-        elif vehicle_type_dists != None:
-            vehicle_type_dists = validate_list_types(vehicle_type_dists, float, param_name="vehicle_type_dists", curr_sim_step=self.curr_step)
-            if len(vehicle_type_dists) != len(vehicle_types):
-                desc = "Invalid vehicle_type_dists (must be same length as vehicle_types, {0} != {1}).".format(len(vehicle_type_dists), len(vehicle_types))
-                raise_warning(ValueError, desc, self.curr_step)
-
-        insertion_sd = validate_type(insertion_sd, (int, float), "insertion_sd", self.curr_step)
-
-        # Create demand table if adding flow for the first time
-        if not self._manual_flow:
-            self._manual_flow = True
-            self._demand_headers = ["routing", "step_range", "veh/step", "vehicle_types", "vehicle_type_dists", "init_speed", "origin_lane", "origin_pos", "insertion_sd"]
-            self._demand_arrs, self._man_flow_id = [], 0
-
-        self._demand_arrs.append([routing, step_range, demand, vehicle_types, vehicle_type_dists, initial_speed, origin_lane, origin_pos, insertion_sd])
-
-    def add_demand_function(self, routing: str|list|tuple, step_range: list|tuple, demand_function, parameters: dict|None = None, vehicle_types: str|list|tuple|None = None, vehicle_type_dists: list|tuple|None = None, initial_speed: str|int|float = "max", origin_lane: str|int|float = "best", origin_pos: str|int = "base", insertion_sd: float = 1/3):
-        """
-        Adds traffic flow demand calculated for each step using a 'demand_function'. 'step' is the only required parameter of the function.
-
-        Args:
-            `routing` (str, list, tuple): Either a route ID or OD pair of edge IDs
-            `step_range` (list, tuple): (2x1) list or tuple denoting the start and end steps of the demand
-            `demand_function` (function): Function used to calculate flow (vehicles/hour)
-            `parameters` (dict, optional):Dictionary containing extra parameters for the demand function
-            `vehicle_types` (str, list, tuple, optional):List of vehicle type IDs
-            `vehicle_type_dists` (list, tuple, optional):Vehicle type distributions used when generating flow
-            `initial_speed` (str, int, float): Initial speed at insertion, either ['_max_'|'_random_'] or number > 0
-            `origin_lane` (str, int, float): Lane for insertion at origin, either ['_random_'|'_free_'|'_allowed_'|'_best_'|'_first_'] or lane index
-            `origin_pos` (str, int): Longitudinal position at insertion, either ['_random_'|'_free_'|'_random\_free_'|'_base_'|'_last_'|'_stop_'|'_splitFront_'] or offset
-            `insertion_sd` (float): Vehicle insertion number standard deviation, at each step
-        """
-        
-        step_range = validate_list_types(step_range, ((int), (int)), True, "step_range", self.curr_step)
-        if step_range[1] < step_range[0] or step_range[1] < self.curr_step:
-            desc = "Invalid step_range '{0}' (must be valid range and end > current step)."
-            raise_error(ValueError, desc, self.curr_step)
-        
-        # Step through start -> end, calculate flow value 
-        for step_no in range(step_range[0], step_range[1]):
-            
-            params = {"step": step_no}
-            if parameters != None: params.update(parameters)
-            demand_val = demand_function(**params)
-
-            # Outputs must be a number
-            if not isinstance(demand_val, (int, float)):
-                desc = "Invalid demand function (output must be type 'int', not '{0}').".format(type(demand_val).__name__)
-                raise_error(TypeError, desc, self.curr_step)
-            
-            # Skip if equal to or less than 0
-            if demand_val <= 0: continue
-
-            self.add_demand(routing, (step_no, step_no), demand_val, vehicle_types, vehicle_type_dists, initial_speed, origin_lane, origin_pos, insertion_sd)
 
     def _add_demand_vehicles(self) -> None:
         """ Implements demand in the demand table. """
 
-        if self._manual_flow:
+        if self._manual_flow and len(self._demand_profiles) > 0:
+
+            for demand_profile in self._demand_profiles:
             
-            for demand_arr in self._demand_arrs:
-                step_range = demand_arr[1]
-                if self.curr_step < step_range[0]: continue
-                elif self.curr_step > step_range[1]: continue
+                for demand_arr in demand_profile._demand_arrs:
+                    step_range = demand_arr[1]
+                    if self.curr_step < step_range[0]: continue
+                    elif self.curr_step > step_range[1]: continue
 
-                routing = demand_arr[0]
-                veh_per_step = (demand_arr[2] / 3600) * self.step_length
-                vehicle_types = demand_arr[3]
-                vehicle_type_dists = demand_arr[4]
-                initial_speed = demand_arr[5]
-                origin_lane = demand_arr[6]
-                origin_pos = demand_arr[7]
-                insertion_sd = demand_arr[8]
-                
-                added = 0
-                if veh_per_step <= 0: continue
-                elif veh_per_step < 1:
-                    # If the number of vehicles to create per step is less than 0,
-                    # use veh_per_step as a probability to add a new vehicle
-                    n_vehicles = 1 if random() < veh_per_step else 0
-                else:
-                    # Calculate the number of vehicles per step to add using a
-                    # normal distribution with veh_per_step and the insertion_sd (standard deviation)
-                    if insertion_sd > 0: n_vehicles = round(np.random.normal(veh_per_step, veh_per_step * insertion_sd, 1)[0])
-                    else: n_vehicles = veh_per_step
-
-                n_vehicles = max(0, n_vehicles)
-
-                while added < n_vehicles:
-                    if isinstance(vehicle_types, list):
-                        vehicle_type = choices(vehicle_types, vehicle_type_dists, k=1)[0]
-                    else: vehicle_type = vehicle_types
-
-                    vehicle_id = "{0}_md_{1}".format(vehicle_type, self._man_flow_id)
+                    routing = demand_arr[0]
+                    veh_per_step = (demand_arr[2] / 3600) * self.step_length
+                    vehicle_types = demand_arr[3]
+                    vehicle_type_dists = demand_arr[4]
+                    initial_speed = demand_arr[5]
+                    origin_lane = demand_arr[6]
+                    origin_pos = demand_arr[7]
+                    insertion_sd = demand_arr[8]
                     
-                    self.add_vehicle(vehicle_id, vehicle_type, routing, initial_speed, origin_lane, origin_pos)
+                    added = 0
+                    if veh_per_step <= 0: continue
+                    elif veh_per_step < 1:
+                        # If the number of vehicles to create per step is less than 0,
+                        # use veh_per_step as a probability to add a new vehicle
+                        n_vehicles = 1 if random() < veh_per_step else 0
+                    else:
+                        # Calculate the number of vehicles per step to add using a
+                        # normal distribution with veh_per_step and the insertion_sd (standard deviation)
+                        if insertion_sd > 0: n_vehicles = round(np.random.normal(veh_per_step, veh_per_step * insertion_sd, 1)[0])
+                        else: n_vehicles = veh_per_step
 
-                    added += 1
-                    self._man_flow_id += 1
+                    n_vehicles = max(0, n_vehicles)
+
+                    while added < n_vehicles:
+                        if isinstance(vehicle_types, list):
+                            vehicle_type = choices(vehicle_types, vehicle_type_dists, k=1)[0]
+                        else: vehicle_type = vehicle_types
+
+                        vehicle_id = "{0}_md_{1}".format(vehicle_type, self._man_flow_id)
+                        
+                        self.add_vehicle(vehicle_id, vehicle_type, routing, initial_speed, origin_lane, origin_pos)
+
+                        added += 1
+                        self._man_flow_id += 1
 
         elif not self._suppress_warnings:
-            desc = "Cannot add flow manually as no demand given."
+            desc = "Cannot add flow manually (no demand profiles)."
             raise_warning(desc, self.curr_step)
 
-    def get_demand_table(self) -> None:
+    def add_vehicle_type(self, vehicle_type_id: str, vehicle_class: str="passenger", colour: str|list|tuple|None = None, length: int|float|None = None, width: int|float|None = None, height: int|float|None = None, mass: int|float|None = None, speed_factor: int|float|None = None, speed_dev: int|float|None = None, min_gap: int|float|None = None, acceleration: int|float|None = None, deceleration: int|float|None = None, tau: int|float|None = None, max_lateral_speed: int|float|None = None, gui_shape: str|None = None) -> None:
         """
-        Get demand table, if dynamically adding demand.
-        
-        Returns:
-            (list, list): Demand table headers & demand table value. Returns None if no table.
+        Adds a new vehicle type to the simulation.
+
+        Args:
+            `vehicle_type_id` (str): ID for the new vehicle type
+            `vehicle_class` (str): Vehicle class (defaults to passenger)
+            `colour` (str, list, tuple, optional): Vehicle type colour, either hex code or list of rgb/rgba values
+            `length` (int, float, optional): Length of vehicle in metres/feet
+            `width` (int, float, optional): Width of vehicle in metres/feet
+            `height` (int, float, optional): Height of vehicle in metres/feet
+            `mass` (int, float, optional): Mass of vehicle in kilograms
+            `speed_factor` (int, float, optional): Vehicle type multiplier for lane speed limits
+            `speed_dev` (int, float, optional): Vehicle type deviation of the speed factor
+            `min_gap` (int, float, optional): Minimum gap after leader (m)
+            `acceleration` (int, float, optional): Vehicle type acceleration ability (m/s^2)
+            `deceleration` (int, float, optional): Vehicle type deceleration ability (m/s^2)
+            `tau` (int, float, optional): Car following model parameter
+            `max_lateral_speed` (int, float, optional): Maximum lateral speed (m/s)
+            `gui_shape` (str, optional): Vehicle shape in GUI (defaults to vehicle class name)
         """
         
-        if self._manual_flow:
-            return self._demand_headers, self._demand_arrs
-        else: return None
+        if self.vehicle_type_exists(vehicle_type_id):
+            desc = f"Cannot create vehicle type (ID '{vehicle_type_id}' already exists)."
+            raise_error(KeyError, desc, self.curr_step)
+
+        traci.vehicletype.copy('DEFAULT_VEHTYPE', vehicle_type_id)
+        traci.vehicletype.setVehicleClass(vehicle_type_id, vehicle_class)
+        
+        if self._gui:
+
+            gui_shape = vehicle_class if gui_shape == None else gui_shape
+            traci.vehicletype.setShapeClass(vehicle_type_id, gui_shape)
+
+            colour = colour_to_rgba(colour)
+            traci.vehicletype.setColor(vehicle_type_id, colour)
+
+        values = [length, height, mass, speed_factor, speed_dev, min_gap, acceleration, deceleration, tau, max_lateral_speed]
+        labels = ['length', 'height', 'mass', 'speed_factor', 'speed_dev', 'min_gap', 'acceleration', 'deceleration', 'tau', 'max_lateral_speed']
+        min_vals = [0.1, 0.1, 0.1, 0.1, 0.1, 0, 0, 0, 0, 0]
+        for value, min_val, label in zip(values, min_vals, labels):
+            if isinstance(value, (int, float)):
+                if value < min_val:
+                    desc = f"Invalid {label} '{value}' (must be >= {min_val})."
+                    raise_error(ValueError, desc, self.curr_step)
+            elif value != None:
+                desc = f"Invalid {label} '{value}' (must be [int|float], not '{type(value).__name__}')."
+                raise_error(TypeError, desc, self.curr_step)
+
+        if isinstance(length, (int, float)):
+            traci.vehicletype.setLength(vehicle_type_id, convert_units(length, "metres", self._s_dist_unit))
+        if isinstance(width, (int, float)):
+            traci.vehicletype.setWidth(vehicle_type_id, convert_units(width, "metres", self._s_dist_unit))
+        if isinstance(height, (int, float)):
+            traci.vehicletype.setHeight(vehicle_type_id, convert_units(height, "metres", self._s_dist_unit))
+        if isinstance(mass, (int, float)):
+            traci.vehicletype.setMass(vehicle_type_id, mass)
+        if isinstance(speed_factor, (int, float)):
+            traci.vehicletype.setSpeedFactor(vehicle_type_id, speed_factor)
+        if isinstance(speed_dev, (int, float)):
+            traci.vehicletype.setSpeedDeviation(vehicle_type_id, speed_dev)
+        if isinstance(min_gap, (int, float)):
+            traci.vehicletype.setMinGap(vehicle_type_id, min_gap)
+        if isinstance(acceleration, (int, float)):
+            traci.vehicletype.setAccel(vehicle_type_id, acceleration)
+        if isinstance(deceleration, (int, float)):
+            traci.vehicletype.setDecel(vehicle_type_id, deceleration)
+        if isinstance(tau, (int, float)):
+            traci.vehicletype.setTau(vehicle_type_id, tau)
+        if isinstance(max_lateral_speed, (int, float)):
+            traci.vehicletype.setMaxSpeedLat(vehicle_type_id, max_lateral_speed)
+
+        self._added_vehicle_types.add(vehicle_type_id)
 
     def add_tracked_junctions(self, junctions: str|list|tuple|dict|None = None) -> None:
         """
@@ -813,10 +642,8 @@ class Simulation:
         if not self._running: return self._running
 
         if traci.simulation.getMinExpectedNumber() == 0:
-            if self._demand_arrs != None:
-                if len(self._demand_arrs) > 0:
-                    for arr in self._demand_arrs:
-                        if arr[1][1] > self.curr_step: return True
+
+            if False not in [dp.is_complete() for dp in self._demand_profiles]: return True
             if close: self.end()
             if not self._suppress_warnings:
                 raise_warning("Ended simulation early (no vehicles remaining).", self.curr_step)
@@ -1008,8 +835,8 @@ class Simulation:
                 if len(self.tracked_edges) > 0: all_data["data"]["edges"] = {}
                 if len(self.controllers) > 0: all_data["data"]["controllers"] = {}
                 all_data["data"]["vehicles"] = {"no_vehicles": [], "no_waiting": [], "tts": [], "twt": [], "delay": [], "to_depart": []}
-                if self._manual_flow and self._demand_arrs != None:
-                    all_data["data"]["demand"] = {"headers": self._demand_headers, "table": self._demand_arrs}
+                if len(self._demand_profiles) > 0:
+                    all_data["data"]["demand"] = [{"headers": dp._demand_headers, "table": dp._demand_arrs} for dp in self._demand_profiles]
                 all_data["data"]["trips"] = {"incomplete": {}, "completed": {}}
                 if self._get_individual_vehicle_data: all_data["data"]["all_vehicles"] = []
                 if self._scheduler != None: all_data["data"]["events"] = {}
@@ -2652,7 +2479,7 @@ class Simulation:
         Args:
             `type` (str): Vehicle type ID
             `vehicle_ids` (list, tuple, str): Vehicle ID or list of IDs
-            `colour` (str, (int)): Sets vehicle colour
+            `colour` (str, (int)): Sets vehicle colour, either hex code or list of rgb/rgba values
             `highlight` (bool): Highlights the vehicle with a circle (bool)
             `speed` (int, float): Set new speed value
             `max_speed` (int, float): Set new max speed value
@@ -2691,23 +2518,7 @@ class Simulation:
                         
                     case "colour":
                         if value != None:
-                            colour = value
-                            if isinstance(colour, str):
-                                if "#" in colour: colour = colour.lstrip("#")
-                                if len(colour) != 6:
-                                    desc = "({0}): '{1}' is not a valid hex colour.".format(command, colour)
-                                    raise_error(ValueError, desc, self.curr_step)
-                                colour = tuple(int(colour[i:i+2], 16) for i in (0, 2, 4))
-                            elif not isinstance(colour, (list, tuple)):
-                                desc = "({0}): Invalid colour (must be [str|list|tuple], not '{1}').".format(command, type(colour).__name__)
-                                raise_error(TypeError, desc, self.curr_step)
-                            elif len(colour) not in [3, 4] or all(x > 255 for x in colour) or all(x < 0 for x in colour):
-                                desc = "({0}): '{1}' is not a valid RGB or RGBA colour.".format(command, colour)
-                                raise_error(ValueError, desc, self.curr_step)
-                            
-                            if len(colour) == 3: colour = list(colour) + [255]
-
-                            traci.vehicle.setColor(vehicle_id, colour)
+                            traci.vehicle.setColor(vehicle_id, colour_to_rgba(value, self.curr_step, f"({command}): "))
                         else:
                             vehicle_type = self.get_vehicle_vals(vehicle_id, "type")
                             type_colour = tuple(traci.vehicletype.getColor(vehicle_type))
@@ -2878,7 +2689,7 @@ class Simulation:
             list: All vehicle type IDs
         """
 
-        return list(self._all_vehicle_types)
+        return list(self._vehicle_types) + list(self._added_vehicle_types)
     
     def get_geometry_ids(self, geometry_types: str|list|tuple|None = None) -> list:
         """
@@ -3782,7 +3593,7 @@ class Simulation:
 
         vehicle_type_id = validate_type(vehicle_type_id, str, "vehicle_type_id", self.curr_step)
 
-        return vehicle_type_id in list(self._all_vehicle_types)
+        return vehicle_type_id in list(self._vehicle_types) + list(self._added_vehicle_types)
 
     def get_event_ids(self, event_statuses: str|list|tuple|None = None) -> list:
         """

@@ -94,6 +94,21 @@ valid_get_lane_val_keys = [data_key for data_key, cfg in valid_data_keys["geomet
 valid_set_geometry_val_keys = [data_key for data_key, cfg in valid_data_keys["geometry"].items() if cfg["setter"]]
 traci_constants["geometry"] = {data_key: cfg["tc"] for data_key, cfg in valid_data_keys["geometry"].items() if cfg["tc"] != None}
 
+sumo_colours = {
+        "red": (255, 0, 0, 255),
+        "green": (0, 255, 0, 255),
+        "blue": (0, 0, 255, 255),
+        "yellow": (255, 255, 0, 255),
+        "cyan": (0, 255, 255, 255),
+        "magenta": (255, 0, 255, 255),
+        "orange": (255, 128, 0, 255),
+        "white": (255, 255, 255, 255),
+        "black": (0, 0, 0, 255),
+        "grey": (128, 128, 128, 255),
+        "gray": (128, 128, 128, 255),
+        "invisible": (0, 0, 0, 0)
+}
+
 class Units(Enum):
     METRIC = 1
     IMPERIAL = 2
@@ -275,6 +290,27 @@ def convert_units(values, orig_units, new_units, step_length=1, keep_arr=False):
     if len(values) == 1 and not keep_arr: values = values[0]
 
     return values
+
+def colour_to_rgba(colour, curr_step=None, err_prefix=None):
+
+    err_prefix = "" if err_prefix == None else err_prefix
+    if isinstance(colour, str):
+        if colour in sumo_colours: return sumo_colours[colour]
+        if "#" in colour: colour = colour.lstrip("#")
+        if len(colour) != 6:
+            desc = f"{err_prefix}'{colour}' is not a valid hex colour."
+            raise_error(ValueError, desc, curr_step)
+        colour = tuple(int(colour[i:i+2], 16) for i in (0, 2, 4))
+    elif not isinstance(colour, (list, tuple)):
+        desc = f"{err_prefix}Invalid colour (must be [str|list|tuple], not '{type(colour).__name__}')."
+        raise_error(TypeError, desc, curr_step)
+    elif len(colour) not in [3, 4] or all(x > 255 for x in colour) or all(x < 0 for x in colour):
+        desc = f"{err_prefix}'{colour}' is not a valid RGB or RGBA colour."
+        raise_error(ValueError, desc, curr_step)
+    
+    if len(colour) == 3: colour = list(colour) + [255]
+
+    return colour
 
 def get_time_steps(data_vals, unit, step_len=None, start=0):
     time_vals = list(range(len(data_vals)))
