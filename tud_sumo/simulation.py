@@ -86,6 +86,9 @@ class Simulation:
         self._gui_veh_tracking = {}
         self._recorder = None
 
+        from .__init__ import __version__
+        self._tuds_version = __version__
+
     def __str__(self):
         if self.scenario_name != None:
             return "<{0}: '{1}'>".format(self.__name__, self.scenario_name)
@@ -304,8 +307,9 @@ class Simulation:
             else: _name = "'{0}' Scenario".format(self.scenario_name)
 
             if self._verbose:
-                print("Running {0}".format(_name))
-                print("  - Start time: {0}".format(self._sim_start_time))
+                print(f"Running {_name}")
+                print(f"  - TUD-SUMO version: {self._tuds_version}")
+                print(f"  - Start time: {self._sim_start_time}")
 
     def save_objects(self, filename: str|None = None, overwrite: bool = True, json_indent: int|None = 4) -> None:
         """
@@ -822,7 +826,7 @@ class Simulation:
         if keep_data:
             # Create a new blank sim_data dictionary here
             if prev_data == None:
-                all_data = {"scenario_name": "", "scenario_desc": "", "data": {}, "start": start_time, "end": self.curr_step, "step_len": self.step_length, "units": self.units.name, "seed": self._seed, "sim_start": self._sim_start_time, "sim_end": get_time_str()}
+                all_data = {"scenario_name": "", "scenario_desc": "", "tuds_version": self._tuds_version, "data": {}, "start": start_time, "end": self.curr_step, "step_len": self.step_length, "units": self.units.name, "seed": self._seed, "sim_start": self._sim_start_time, "sim_end": get_time_str()}
                 
                 if self.scenario_name == None: del all_data["scenario_name"]
                 else: all_data["scenario_name"] = self.scenario_name
@@ -2010,7 +2014,7 @@ class Simulation:
             `routing` (str, list, tuple): Either route ID or (2x1) list of edge IDs for origin-destination pair
             `initial_speed` (str, int, float): Initial speed at insertion, either ['_max_'|'_random_'] or number > 0
             `origin_lane` (str, int, float): Lane for insertion at origin, either ['_random_'|'_free_'|'_allowed_'|'_best_'|'_first_'] or lane index
-            `origin_pos` (str, int): Longitudinal position at insertion, either ['_random_'|'_free_'|'_random\_free_'|'_base_'|'_last_'|'_stop_'|'_splitFront_'] or offset
+            `origin_pos` (str, int): Longitudinal position at insertion, either ['_random_'|'_free_'|'_random_free_'|'_base_'|'_last_'|'_stop_'|'_splitFront_'] or offset
         """
 
         if self.vehicle_exists(vehicle_id):
@@ -2112,7 +2116,7 @@ class Simulation:
             `assert_n_vehicles` (bool): Denotes whether to throw an error if the correct number of vehicles cannot be found
             `edge_speed` (int, float, optional):New max speed for edges where incident vehicles are located (defaults to 15km/h or 10mph)
             `highlight_vehicles` (bool): Denotes whether to highlight vehicles in the SUMO GUI
-            `incident_id` (str, optional):Incident event ID used in the simulation data file (defaults to '_incident\_{n}_')
+            `incident_id` (str, optional):Incident event ID used in the simulation data file (defaults to '_incident_{n}_')
 
         Returns:
             bool: Denotes whether incident was successfully created
