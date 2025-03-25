@@ -418,8 +418,8 @@ class DemandProfile:
         Removes all demand from the profile in the range [start_step, end_step] (inclusive).
 
         Args:
-            `start_step` (int): Start step of the removal period
-            `end_step` (int): End step of the removal period
+            `start_step` (int): Start step of the removal period (seconds)
+            `end_step` (int): End step of the removal period (seconds)
         """
 
         rm_start, rm_end = start_step * self.step_length, end_step * self.step_length
@@ -430,10 +430,10 @@ class DemandProfile:
             arr_start, arr_end = demand_arr[1][0], demand_arr[1][1]
             
             if arr_start < rm_start and arr_end <= rm_end:
-                demand_arr[1][1] = rm_start - self.step_length
+                demand_arr[1] = (demand_arr[1][0], min(demand_arr[1][1], rm_start - self.step_length))
             
             elif arr_start >= rm_start and arr_end > rm_end:
-                demand_arr[1][0] = rm_end + self.step_length
+                demand_arr[1] = (max(demand_arr[1][0], rm_end + self.step_length), demand_arr[1][1])
 
             elif arr_start >= rm_start and arr_end <= rm_end:
                 continue
