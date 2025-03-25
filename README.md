@@ -26,7 +26,7 @@ Python SUMO wrapper, using traci, written for the DAIMoND Lab at TU Delft by Cal
 
 ## Requirements 
 
-Python 3.10 or later is required. Dependencies are; `tqdm`, `matplotlib`, `mpl-tools`, `shapely`, `requests`, `sumolib` and `traci`.
+Python 3.10 or later is required. Dependencies are; `tqdm`, `matplotlib`, `mpl-tools`, `shapely`, `requests`, `moviepy`, `sumolib` and `traci`.
 
 ## Contact Information
 

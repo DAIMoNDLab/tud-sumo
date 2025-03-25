@@ -321,6 +321,7 @@ class DemandProfile:
             `origin_lane` (str, int): Lane for insertion at origin, either ['_random_'|'_free_'|'_allowed_'|'_best_'|'_first_'] or lane index
             `origin_pos` (str, int): Longitudinal position at insertion, either ['_random_'|'_free_'|'_random_free_'|'_base_'|'_last_'|'_stop_'|'_splitFront_'] or offset
             `insertion_sd` (float): Vehicle insertion number standard deviation, at each step
+            `colour` (str, list, tuple, optional): Vehicle colour, either hex code, list of rgb/rgba values or valid SUMO colour string
         """
 
         if self.sim == None:
@@ -387,6 +388,7 @@ class DemandProfile:
             `origin_lane` (str, int, float): Lane for insertion at origin, either ['_random_'|'_free_'|'_allowed_'|'_best_'|'_first_'] or lane index
             `origin_pos` (str, int): Longitudinal position at insertion, either ['_random_'|'_free_'|'_random_free_'|'_base_'|'_last_'|'_stop_'|'_splitFront_'] or offset
             `insertion_sd` (float): Vehicle insertion number standard deviation, at each step
+            `colour` (str, list, tuple, optional): Vehicle colour, either hex code, list of rgb/rgba values or valid SUMO colour string
         """
         
         step_range = validate_list_types(step_range, ((int), (int)), True, "step_range", self.sim.curr_step)

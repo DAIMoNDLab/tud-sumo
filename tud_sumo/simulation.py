@@ -547,7 +547,7 @@ class Simulation:
         Args:
             `vehicle_type_id` (str): ID for the new vehicle type
             `vehicle_class` (str): Vehicle class (defaults to passenger)
-            `colour` (str, list, tuple, optional): Vehicle type colour, either hex code or list of rgb/rgba values
+            `colour` (str, list, tuple, optional): Vehicle type colour, either hex code, list of rgb/rgba values or valid SUMO colour string
             `length` (int, float, optional): Length of vehicle in metres/feet
             `width` (int, float, optional): Width of vehicle in metres/feet
             `height` (int, float, optional): Height of vehicle in metres/feet
@@ -2531,7 +2531,7 @@ class Simulation:
         Args:
             `type` (str): Vehicle type ID
             `vehicle_ids` (list, tuple, str): Vehicle ID or list of IDs
-            `colour` (str, (int)): Sets vehicle colour, either hex code or list of rgb/rgba values
+            `colour` (str, list, tuple, optional): Vehicle colour, either hex code, list of rgb/rgba values or valid SUMO colour string
             `highlight` (bool): Highlights the vehicle with a circle (bool)
             `speed` (int, float): Set new speed value
             `max_speed` (int, float): Set new max speed value
