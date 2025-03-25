@@ -504,6 +504,7 @@ class Simulation:
                     origin_lane = demand_arr[6]
                     origin_pos = demand_arr[7]
                     insertion_sd = demand_arr[8]
+                    colour = demand_arr[9]
                     
                     added = 0
                     if veh_per_step <= 0: continue
@@ -518,6 +519,7 @@ class Simulation:
                         else: n_vehicles = veh_per_step
 
                     n_vehicles = max(0, n_vehicles)
+                    vehicle_ids = []
 
                     while added < n_vehicles:
                         if isinstance(vehicle_types, list):
@@ -528,8 +530,11 @@ class Simulation:
                         
                         self.add_vehicle(vehicle_id, vehicle_type, routing, initial_speed, origin_lane, origin_pos)
 
+                        vehicle_ids.append(vehicle_id)
                         added += 1
                         self._man_flow_id += 1
+
+                    if colour != None: self.set_vehicle_vals(vehicle_ids, colour=colour)
 
         elif not self._suppress_warnings:
             desc = "Cannot add flow manually (no demand profiles)."

@@ -15,7 +15,8 @@ class DemandProfile:
 
         self.step_length = self.sim.step_length
 
-        self._demand_headers = ["routing", "step_range", "veh/hour", "vehicle_types", "vehicle_type_dists", "init_speed", "origin_lane", "origin_pos", "insertion_sd"]
+        self._demand_headers = ["routing", "step_range", "veh/hour", "vehicle_types", "vehicle_type_dists",
+                                "init_speed", "origin_lane", "origin_pos", "insertion_sd", "colour"]
         self._demand_arrs = []
 
         self._vehicle_types = {}
@@ -144,7 +145,14 @@ class DemandProfile:
 
                 attributes = {"id": "", "type": "", "begin": str(start), "from": origin, "to": destination, "end": str(end),
                             "vehsPerHour": 0, "departLane": str(demand_arr[6]), "departPos": str(demand_arr[7]), "departSpeed": str(demand_arr[5])}
-
+                
+                if demand_arr[9] != None: 
+                    if demand_arr[9] not in sumo_colours:
+                        colour = colour_to_rgba(demand_arr[9], self.sim.curr_step)
+                        if isinstance(colour, (list, tuple)): colour = ",".join([str(val) for val in colour])
+                    else: colour = demand_arr[9]
+                    attributes["color"] = colour
+                    
                 if isinstance(vehicle_types, str): vehicle_types = [vehicle_types]
                 if vehicle_type_dists == None: vehicle_type_dists = [1] * len(vehicle_types)
                 
@@ -171,8 +179,8 @@ class DemandProfile:
             if os.path.exists(csv_file):
                 with open(csv_file, "r") as fp:
 
-                    valid_cols = ["origin", "destination", "route_id", "start_time", "end_time", "start_step", "end_step",
-                                  "demand", "number", "vehicle_types", "vehicle_type_dists", "initial_speed", "origin_lane", "origin_pos", "insertion_sd"]
+                    valid_cols = ["origin", "destination", "route_id", "start_time", "end_time", "start_step", "end_step", "demand", "number",
+                                  "vehicle_types", "vehicle_type_dists", "initial_speed", "origin_lane", "origin_pos", "insertion_sd", "colour"]
                     demand_idxs = {}
                     reader = csv.reader(fp)
                     for idx, row in enumerate(reader):
@@ -226,6 +234,9 @@ class DemandProfile:
 
                             if "insertion_sd" in row:
                                 demand_idxs["insertion_sd"] = row.index("insertion_sd")
+
+                            if "colour" in row:
+                                demand_idxs["colour"] = row.index("colour")
 
                         else:
 
@@ -283,7 +294,11 @@ class DemandProfile:
                                 insertion_sd = float(row[demand_idxs["insertion_sd"]])
                             else: insertion_sd = 0.333
 
-                            self.add_demand(routing, step_range, demand, vehicle_types, vehicle_type_dists, initial_speed, origin_lane, origin_pos, insertion_sd)
+                            if "colour" in demand_idxs:
+                                colour = row[demand_idxs["colour"]]
+                            else: colour = None
+
+                            self.add_demand(routing, step_range, demand, vehicle_types, vehicle_type_dists, initial_speed, origin_lane, origin_pos, insertion_sd, colour)
                             
             else:
                 desc = "Demand file '{0}' not found.".format(csv_file)
@@ -292,7 +307,7 @@ class DemandProfile:
             desc = "Invalid demand file '{0}' format (must be '.csv').".format(csv_file)
             raise_error(ValueError, desc)
 
-    def add_demand(self, routing: str|list|tuple, step_range: list|tuple, demand: int|float, vehicle_types: str|list|tuple|None = None, vehicle_type_dists: list|tuple|None = None, initial_speed: str|int|float = "max", origin_lane: str|int|float = "best", origin_pos: str|int = "base", insertion_sd: float = 0.333) -> None:
+    def add_demand(self, routing: str|list|tuple, step_range: list|tuple, demand: int|float, vehicle_types: str|list|tuple|None = None, vehicle_type_dists: list|tuple|None = None, initial_speed: str|int|float = "max", origin_lane: str|int|float = "best", origin_pos: str|int = "base", insertion_sd: float = 0.333, colour: str|list|tuple|None = None) -> None:
         """
         Adds traffic flow demand for a specific route and time.
         
@@ -355,9 +370,9 @@ class DemandProfile:
         insertion_sd = validate_type(insertion_sd, (int, float), "insertion_sd", self.sim.curr_step)
 
         self.sim._manual_flow = True
-        self._demand_arrs.append([routing, step_range, demand, vehicle_types, vehicle_type_dists, initial_speed, origin_lane, origin_pos, insertion_sd])
+        self._demand_arrs.append([routing, step_range, demand, vehicle_types, vehicle_type_dists, initial_speed, origin_lane, origin_pos, insertion_sd, colour])
 
-    def add_demand_function(self, routing: str|list|tuple, step_range: list|tuple, demand_function, parameters: dict|None = None, vehicle_types: str|list|tuple|None = None, vehicle_type_dists: list|tuple|None = None, initial_speed: str|int|float = "max", origin_lane: str|int|float = "best", origin_pos: str|int = "base", insertion_sd: float = 0.333) -> None:
+    def add_demand_function(self, routing: str|list|tuple, step_range: list|tuple, demand_function, parameters: dict|None = None, vehicle_types: str|list|tuple|None = None, vehicle_type_dists: list|tuple|None = None, initial_speed: str|int|float = "max", origin_lane: str|int|float = "best", origin_pos: str|int = "base", insertion_sd: float = 0.333, colour: str|list|tuple|None = None) -> None:
         """
         Adds traffic flow demand calculated for each step using a 'demand_function'. 'step' is the only required parameter of the function.
 
@@ -394,7 +409,7 @@ class DemandProfile:
             # Skip if equal to or less than 0
             if demand_val <= 0: continue
 
-            self.add_demand(routing, (step_no, step_no), demand_val, vehicle_types, vehicle_type_dists, initial_speed, origin_lane, origin_pos, insertion_sd)
+            self.add_demand(routing, (step_no, step_no), demand_val, vehicle_types, vehicle_type_dists, initial_speed, origin_lane, origin_pos, insertion_sd, colour)
 
     def remove_demand(self, start_step: int, end_step: int) -> None:
         """
