@@ -15,7 +15,7 @@ class DemandProfile:
 
         self.step_length = self.sim.step_length
 
-        self._demand_headers = ["routing", "step_range", "veh/step", "vehicle_types", "vehicle_type_dists", "init_speed", "origin_lane", "origin_pos", "insertion_sd"]
+        self._demand_headers = ["routing", "step_range", "veh/hour", "vehicle_types", "vehicle_type_dists", "init_speed", "origin_lane", "origin_pos", "insertion_sd"]
         self._demand_arrs = []
 
         self._vehicle_types = {}
