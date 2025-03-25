@@ -101,12 +101,12 @@ class Simulation:
         Intialises SUMO simulation.
 
         Args:
-            `config_file` (str, optional):Location of '_.sumocfg_' file (can be given instead of net_file)
-            `net_file` (str, optional):Location of '_.net.xml_' file (can be given instead of config_file)
-            `route_file` (str, optional):Location of '_.rou.xml_' route file
-            `add_file` (str, optional):Location of '_.add.xml_' additional file
-            `gui_file` (str, optional):Location of '_.xml_' gui (view settings) file
-            `cmd_options` (list, optional):List of any other command line options
+            `config_file` (str, optional): Location of '_.sumocfg_' file (can be given instead of net_file)
+            `net_file` (str, optional): Location of '_.net.xml_' file (can be given instead of config_file)
+            `route_file` (str, optional): Location of '_.rou.xml_' route file
+            `add_file` (str, optional): Location of '_.add.xml_' additional file
+            `gui_file` (str, optional): Location of '_.xml_' gui (view settings) file
+            `cmd_options` (list, optional): List of any other command line options
             `units` (str, int): Data collection units [1 (metric) | 2 (IMPERIAL) | 3 (UK)] (defaults to 'metric')
             `get_individual_vehicle_data` (bool): Denotes whether to get individual vehicle data (set to `False` to improve performance)
             `automatic_subscriptions` (bool): Denotes whether to automatically subscribe to commonly used vehicle data (speed and position, defaults to `True`)
@@ -427,18 +427,28 @@ class Simulation:
             self.add_events(object_parameters["events"])
 
         if "demand" in object_parameters:
-            self.load_demand_profiles(object_parameters["demand"])
+            _ = self.load_demand_profiles(object_parameters["demand"])
 
         if "routes" in object_parameters:
 
             for r_id, route in object_parameters["routes"].items():
                 self.add_route(route, r_id)
 
-    def load_demand_profiles(self, demand_profiles: str|list|tuple) -> None:
+    def load_demand_profiles(self, demand_profiles: str|dict|list|tuple) -> list:
+        """
+        Load demand profile(s) into the simulation.
+
+        Args:
+            `demand_profiles` (str, list, tuple): Either a filename to a previously saved DemandProfile object, or list of filenames
+
+        Returns:
+            list: List of DemandProfile objects
+        """
 
         if not isinstance(demand_profiles, (list, tuple)): demand_profiles = [demand_profiles]
         validate_list_types(demand_profiles, (str, dict), param_name='demand_profiles', curr_sim_step=self.curr_step)
 
+        loaded = []
         for dp_f in demand_profiles:
 
             if isinstance(dp_f, str):
@@ -483,6 +493,11 @@ class Simulation:
             self._demand_profiles[demand_profile.id] = demand_profile
 
             self._manual_flow = True
+
+            loaded.append(demand_profile)
+
+        if len(loaded) == 0: loaded = loaded[0]
+        return loaded
 
     def _add_demand_vehicles(self) -> None:
         """ Implements demand in the demand table. """
@@ -4474,6 +4489,9 @@ def print_summary(sim_data: dict|str, save_file: str|None=None, tab_width: int=5
     secondary_delineator = " *"+"-"*(tab_width+2)+"*"
     tertiary_delineator = " * "+"-"*tab_width+" *"
     
+    print(primary_delineator)
+    _table_print(f"TUD-SUMO v{sim_data["tuds_version"]}")
+
     print(primary_delineator)
     _table_print(sim_data["scenario_name"], tab_width)
     if "scenario_desc" in sim_data.keys():
