@@ -10,6 +10,7 @@ from matplotlib.colors import is_color_like as is_mpl_colour
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from .simulation import Simulation
+from .demand import DemandProfile
 from .utils import *
 
 class _GenericPlotter():
@@ -1079,80 +1080,103 @@ class Plotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_od_demand(self, routing: str|list|tuple|None=None, plot_sim_dur: bool=True, show_events: str|list|None=None, plt_colour: str|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_demand(self, routing: str|list|tuple|None=None, demand_profiles: DemandProfile|list|tuple|None=None, time_range: list|tuple|None=None, show_events: str|list|None=None, plt_colour: str|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
         """
-        Plots traffic demand added with TUD-SUMO. Demand defined within '_.rou.xml_' files is not plotted.
-        
+        Plots demand from TUD-SUMO DemandProfile(s). By default, all demand profiles are plotted.
+        Demand defined within '_.rou.xml_' files is not plotted.
+
         Args:
-            `routing` (str, list, tuple, optional): Either string (route ID or 'all'), OD pair ('A', 'B') or None (defaulting to all)
-            `plot_sim_dur` (bool): If `False`, only previous demand in the simulation is plotted, otherwise all demand
+            `routing` (str, list, tuple, optional): Either string (route ID or 'all'), OD pair eg. ('A', 'B') or None (defaulting to all)
+            `demand_profiles` (DemandProfile, list, tuple, optional): Either DemandProfile object or list of DemandProfiles (defaults to all added to simulation)
+            `time_range` (list, tuple, optional): Plotting time range (in plotter class units)
             `show_events` (str, list, optional): Event ID, list of IDs, '_all_', '_scheduled_', '_active_', '_completed_' or `None`
             `plt_colour` (str, optional): Line colour for plot (defaults to TUD 'cyaan')
             `fig_title` (str, optional): If given, will overwrite default title
             `save_fig` (str, optional): Output image filename, will show image if not given
         """
 
-        demand_arrs = None
         if self.simulation != None:
             self.sim_data = self.simulation.__dict__()
             self.units = self.simulation.units.name
+            step_len = self.simulation.step_length
+
+        dps = []
+        if isinstance(demand_profiles, DemandProfile): dps.append(demand_profiles)
+        elif isinstance(demand_profiles, (list, tuple)):
+            validate_list_types(demand_profiles, DemandProfile, param_name='demand_profiles')
+            dps = list(demand_profiles)
+        elif demand_profiles == None:
             
-            demand_data = self.simulation.get_demand_table()
-            if demand_data != None:
-                demand_arrs = demand_data[1]
+            if self.simulation != None and len(self.simulation._demand_profiles) > 0:
+                    dps = list(self.simulation._demand_profiles.values())
 
-                step = self.simulation.step_length
-                plot_sim_dur = False
+            elif "demand" in self.sim_data["data"]:
+                dps = self.sim_data["data"]["demand"]["profiles"]
+                step_len = self.sim_data["step_len"]
+
+            if len(dps) == 0:
+                desc = "Cannot plot demand (no demand profiles found)."
+                raise_error(KeyError, desc)
+
         else:
-            if "demand" in self.sim_data["data"]:
-                demand_arrs = self.sim_data["data"]["demand"]["table"]
+            desc = f"Invalid demand_profiles (must be [DemandProfile|list|tuple|None], not '{type(demand_profiles)}')"
+            raise_error(TypeError, desc)
 
-                step, start, end = self.sim_data["step_len"], self.sim_data["start"], self.sim_data["end"]
-        
-        if demand_arrs == None:
-            desc = "No demand data to plot."
+        dps = [dp._demand_arrs if isinstance(dp, DemandProfile) else dp for dp in dps]
+
+        start_times, end_times = [], []
+        for dp in dps:
+            for arr in dp:
+                start_times.append(arr[1][0])
+                end_times.append(arr[1][1])
+
+        if time_range == None:
+            time_range = [min(start_times), max(end_times)]
+        else:
+            validate_list_types(time_range, (int, float), param_name='time_range')
+            if time_range[1] <= min(start_times) or time_range[0] >= max(end_times) or time_range[0] >= time_range[1]:
+                desc = f"Invalid time_range (no demand within range '{time_range[0]} - {time_range[1]}')."
+                raise_error(ValueError, desc)
+
+        demand_vals = [0] * int((time_range[1] - time_range[0]) / step_len + 1)
+        time_vals = [idx * step_len + time_range[0] for idx, _ in enumerate(demand_vals)]
+
+        added_demand = False
+        for demand_profile in dps:
+            for demand_arr in demand_profile:
+
+                arr_routing, demand_val = demand_arr[0], demand_arr[2]
+                arr_start, arr_end = int(demand_arr[1][0]), int(demand_arr[1][1])
+
+                if routing != None:
+                    if isinstance(routing, str) and not isinstance(arr_routing, str):
+                        if routing != "all": continue
+
+                    elif isinstance(routing, str) and isinstance(arr_routing, str):
+                        if routing != arr_routing and routing != "all": continue
+                        
+                    elif isinstance(routing, (list, tuple)) and isinstance(arr_routing, (list, tuple)):
+                        if routing[0] != arr_routing[0] or routing[1] != arr_routing[1]: continue
+
+                if arr_start > time_range[1] or arr_end < time_range[0]: continue
+
+                arr_start = max(int((arr_start - time_range[0]) / step_len), 0)
+                arr_end = min(int((arr_end - time_range[0]) / step_len), len(demand_vals) - 1)
+                
+                for idx in range(arr_start, arr_end + 1): demand_vals[idx] += demand_val
+                added_demand = True
+
+        if not added_demand:
+            desc = "Cannot plot demand (empty demand profiles)."
             raise_error(KeyError, desc)
 
+        time_vals = convert_units(time_vals, "seconds", self.time_unit, step_len)
         fig, ax = plt.subplots(1, 1)
-        
-        if not plot_sim_dur:
-            start, end = 0, -math.inf
-            for demand_arr in demand_arrs:
-                end = max(end, demand_arr[1][1])
 
-        start, end = int(start), int(end)
-        demand_vals, added_val = [0] * (end - start), False
-        time_steps = get_time_steps(demand_vals, self.time_unit, step, start)
-
-        for demand_arr in demand_arrs:
-
-            arr_routing, vehs_per_step = demand_arr[0], demand_arr[2]
-            arr_start, arr_end = int(demand_arr[1][0]), int(demand_arr[1][1])
-
-            if routing != None:
-                if isinstance(routing, str) and not isinstance(arr_routing, str):
-                    if routing != "all": continue
-
-                elif isinstance(routing, str) and isinstance(arr_routing, str):
-                    if routing != arr_routing and routing != "all": continue
-                    
-                elif isinstance(routing, (list, tuple)) and isinstance(arr_routing, (list, tuple)):
-                    if routing[0] != arr_routing[0] or routing[1] != arr_routing[1]: continue
-
-            if arr_start > end or arr_end < start: continue
-
-            for idx in range(max(start, arr_start), min(end, arr_end+1)):
-                demand_vals[idx] += vehs_per_step
-                added_val = True
-
-        if not added_val:
-            desc = "Unknown routing '{0}' (no demand found).".format(routing)
-            raise_error(KeyError, desc)
-
-        ax.plot(time_steps, demand_vals, color=self._get_colour(plt_colour))
+        ax.plot(time_vals, demand_vals, color=self._get_colour(plt_colour))
         ax.set_ylabel("Demand (vehicles/hour)")
         ax.set_xlabel(self._default_labels["sim_time"])
-        ax.set_xlim([convert_units(start, "steps", self.time_unit, step), convert_units(end, "steps", self.time_unit, step)])
+        ax.set_xlim([time_vals[0], time_vals[-1]])
         ax.set_ylim([0, get_axis_lim(demand_vals)])
         self._add_grid(ax, None)
         if fig_title == None:

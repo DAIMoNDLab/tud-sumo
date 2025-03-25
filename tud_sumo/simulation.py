@@ -1,4 +1,4 @@
-import os, sys, io, traci, sumolib, json, csv, math, inspect, importlib.util
+import os, sys, io, traci, sumolib, json, pickle, math, inspect, importlib.util
 import pickle as pkl
 import numpy as np
 from tqdm import tqdm
@@ -49,9 +49,7 @@ class Simulation:
 
         self._manual_flow = False
 
-        self._demand_files = []
-
-        self._demand_profiles = []
+        self._demand_profiles = {}
         self._man_flow_id = 0
 
         self.controllers = {}
@@ -317,7 +315,7 @@ class Simulation:
 
         Args:
             `filename` (str, optional):Output filename ('_.json_' or '_.pkl_')
-            `overwrite` (bool): Denotes whether to overwrite previous outputs
+            `overwrite` (bool): Denotes whether to allow overwriting previous outputs
             `json_indent` (int, optional):Indent used when saving JSON files
         """
 
@@ -347,8 +345,9 @@ class Simulation:
 
         if len(self._demand_profiles) > 0:
             all_files = []
-            for dp in self._demand_profiles:
-                all_files += dp._demand_files
+            for dp in self._demand_profiles.values():
+                dp_dict = {k: v for k, v in dp.__dict__.items() if k not in ['id', 'sim', 'step_length', '_demand_headers']}
+                all_files.append(dp_dict)
             object_params["demand"] = all_files if len(all_files) > 1 else all_files[0]
 
         if len(self._new_routes) > 0:
@@ -428,25 +427,69 @@ class Simulation:
             self.add_events(object_parameters["events"])
 
         if "demand" in object_parameters:
-
-            dp = DemandProfile(self)
-            if isinstance(object_parameters["demand"], list):
-                for csv_file in object_parameters["demand"]:
-                    dp.load_demand(csv_file)
-
-            else: dp.load_demand(object_parameters["demand"])
+            self.load_demand_profiles(object_parameters["demand"])
 
         if "routes" in object_parameters:
 
             for r_id, route in object_parameters["routes"].items():
                 self.add_route(route, r_id)
 
+    def load_demand_profiles(self, demand_profiles: str|list|tuple) -> None:
+
+        if not isinstance(demand_profiles, (list, tuple)): demand_profiles = [demand_profiles]
+        validate_list_types(demand_profiles, (str, dict), param_name='demand_profiles', curr_sim_step=self.curr_step)
+
+        for dp_f in demand_profiles:
+
+            if isinstance(dp_f, str):
+                if not os.path.exists(dp_f):
+                    desc = f"DemandProfile file '{dp_f}' not found."
+                    raise_error(FileNotFoundError, desc, self.curr_step)
+                
+                with open(dp_f, "rb") as fp:
+                    dp_dict = pickle.load(fp)
+
+            else: dp_dict = dp_f
+
+            demand_profile = DemandProfile(self)
+            demand_profile._demand_arrs = dp_dict['_demand_arrs']
+            demand_profile._vehicle_types = dp_dict['_vehicle_types']
+
+            for vehicle_type_id, vehicle_type_data in demand_profile._vehicle_types.items():
+                
+                if not self.vehicle_type_exists(vehicle_type_id):
+                    self.add_vehicle_type(vehicle_type_id, **vehicle_type_data)
+
+            for demand_arr in demand_profile._demand_arrs:
+                routing = demand_arr[0]
+                
+                if isinstance(routing, str) and self.route_exists(routing) == None:
+                    desc = f"Route with ID '{routing}' not found."
+                    raise_error(KeyError, desc, self.curr_step)
+                
+                elif isinstance(routing, (list, tuple)) and len(routing) == 2:
+                    e_ids = {e: e_id for e, e_id in zip(["Origin", "Destination"], routing)}
+                    for e, e_id in e_ids.items():
+                        if self.geometry_exists(e_id) == None:
+                            desc = f"{e} edge '{e_id}' not found."
+                            raise_error(KeyError, desc, self.curr_step)
+
+                else:
+                    desc = f"Invalid routing '{routing}'."
+                    raise_error(ValueError, desc, self.curr_step)
+
+            demand_profile.step_length = self.step_length
+
+            self._demand_profiles[demand_profile.id] = demand_profile
+
+            self._manual_flow = True
+
     def _add_demand_vehicles(self) -> None:
         """ Implements demand in the demand table. """
 
         if self._manual_flow and len(self._demand_profiles) > 0:
 
-            for demand_profile in self._demand_profiles:
+            for demand_profile in self._demand_profiles.values():
             
                 for demand_arr in demand_profile._demand_arrs:
                     step_range = demand_arr[1]
@@ -647,7 +690,7 @@ class Simulation:
 
         if traci.simulation.getMinExpectedNumber() == 0:
 
-            if False not in [dp.is_complete() for dp in self._demand_profiles]: return True
+            if False not in [dp.is_complete() for dp in self._demand_profiles.values()]: return True
             if close: self.end()
             if not self._suppress_warnings:
                 raise_warning("Ended simulation early (no vehicles remaining).", self.curr_step)
@@ -840,7 +883,7 @@ class Simulation:
                 if len(self.controllers) > 0: all_data["data"]["controllers"] = {}
                 all_data["data"]["vehicles"] = {"no_vehicles": [], "no_waiting": [], "tts": [], "twt": [], "delay": [], "to_depart": []}
                 if len(self._demand_profiles) > 0:
-                    all_data["data"]["demand"] = [{"headers": dp._demand_headers, "table": dp._demand_arrs} for dp in self._demand_profiles]
+                    all_data["data"]["demand"] = {"headers": list(self._demand_profiles.values())[0]._demand_headers, "profiles": [dp._demand_arrs for dp in self._demand_profiles.values()]}
                 all_data["data"]["trips"] = {"incomplete": {}, "completed": {}}
                 if self._get_individual_vehicle_data: all_data["data"]["all_vehicles"] = []
                 if self._scheduler != None: all_data["data"]["events"] = {}

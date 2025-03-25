@@ -1,31 +1,61 @@
-import csv, datetime
-import xml.etree.ElementTree as gfg  
+import csv, datetime, copy, pickle, os, string, random as rnd
+import xml.etree.ElementTree as et  
 from .utils import *
 
 class DemandProfile:
 
-    def __init__(self, simulation, name: str|None = None):
+    def __init__(self, simulation):
         from .simulation import Simulation
 
         self.sim = simulation
-        self.sim._demand_profiles.append(self)
+        self.id = None
+        while self.id == None or self.id in self.sim._demand_profiles:
+            self.id = self._generate_id()
+        self.sim._demand_profiles[self.id] = self
+
+        self.step_length = self.sim.step_length
 
         self._demand_headers = ["routing", "step_range", "veh/step", "vehicle_types", "vehicle_type_dists", "init_speed", "origin_lane", "origin_pos", "insertion_sd"]
         self._demand_arrs = []
-        self._demand_files = []
 
         self._vehicle_types = {}
 
-        self.name = name
-
     def __name__(self): return "DemandProfile"
 
+    def _generate_id(self, n: int=10): 
+        """ Generates random ID of length 'n'."""
+
+        return ''.join(rnd.choice(string.ascii_uppercase + string.digits) for _ in range(n))
+
+    def remove(self) -> None:
+        """ Removes the profile from its corresponding simulation. """
+
+        del self.sim._demand_profiles[self.id]
+        self.sim = None
+
     def is_complete(self) -> bool:
+        """ Returns whether all scheduled vehicles have been added to the simulation. """
+        
         if len(self._demand_arrs) == 0: return True
         else:
             end_times = [arr[1][1] for arr in self._demand_arrs]
             return max(end_times) > self.sim.curr_step
         
+    def plot_demand(self, routing: str|list|tuple|None=None, save_fig: str|None=None) -> None:
+        """
+        Plots demand within a demand profile. Alternatively, use `Plotter.plot_demand()`.
+
+        Args:
+            `routing` (str, list, tuple, optional): Either string (route ID or 'all'), OD pair eg. ('A', 'B') or None (defaulting to all)
+            `save_fig` (str, optional): Output image filename, will show image if not given
+        """
+
+        from .plot import Plotter
+
+        plt = Plotter(self.sim, time_unit="hours")
+        plt.plot_demand(routing, self, save_fig=save_fig)
+        del plt
+
     def add_vehicle_type(self, vehicle_type_id: str, vehicle_class: str="passenger", colour: str|list|tuple|None = None, length: int|float|None = None, width: int|float|None = None, height: int|float|None = None, mass: int|float|None = None, speed_factor: int|float|None = None, speed_dev: int|float|None = None, min_gap: int|float|None = None, acceleration: int|float|None = None, deceleration: int|float|None = None, tau: int|float|None = None, max_lateral_speed: int|float|None = None, gui_shape: str|None = None) -> None:
         """
         Adds a new vehicle type to the simulation.
@@ -48,58 +78,60 @@ class DemandProfile:
             `gui_shape` (str, optional): Vehicle shape in GUI (defaults to vehicle class name)
         """
 
-        values = [vehicle_class, colour, length, height, mass, speed_factor, speed_dev, min_gap, acceleration, deceleration, tau, max_lateral_speed, gui_shape]
-        labels = ['vClass', 'color', 'length', 'height', 'mass', 'speedFactor', 'speedDev', 'minGap', 'accel', 'decel', 'tau', 'maxSpeedLat', 'guiShape']
-        
-        vehicle_type_data = {label: value for label, value in zip(labels, values) if value != None}
+        if self.sim == None:
+            desc = "No Simulation object found."
+            raise_error(KeyError, desc)
 
-        self.sim.add_vehicle_type(vehicle_type_id, vehicle_class, colour, length,
-                                  width, height, mass, speed_factor, speed_dev,
-                                  min_gap, acceleration, deceleration, tau,
-                                  max_lateral_speed, gui_shape)
+        values = ['vehicle_class', 'colour', 'length', 'height', 'mass',
+                  'speed_factor', 'speed_dev', 'min_gap', 'acceleration',
+                  'deceleration', 'tau', 'max_lateral_speed', 'gui_shape']
         
-        if "color" in vehicle_type_data:
-            if vehicle_type_data["color"] not in sumo_colours:
-                colour = colour_to_rgba(vehicle_type_data["color"], self.sim.curr_step)
-                if isinstance(colour, (list, tuple)): colour = ",".join([str(val) for val in colour])
-                vehicle_type_data["color"] = colour
+        vehicle_type_data = {name: locals()[name] for name in values}
 
+        self.sim.add_vehicle_type(vehicle_type_id, **vehicle_type_data)
         self._vehicle_types[vehicle_type_id] = vehicle_type_data
         
-    def create_route_file(self, filename: str|None = None, add_to_cfg: bool = True) -> None:
+    def create_route_file(self, filename: str) -> None:
         """
         Create a SUMO '.rou.xml' file from the demand added to this profile.
 
         Args:
-            `filename` (str, optional): Filename for route file (uses profile name if not given)
-            `add_to_cfg` (bool): Denotes whether to add route file to the SUMO config file (if used)
+            `filename` (str): Filename for route file
         """
 
         if len(self._vehicle_types) == 0 and len(self._demand_arrs) == 0:
             desc = "Cannot create route file (no vehicle types or demand data found)."
-            raise_error(KeyError, desc, self.sim.curr_step)
-        
-        if filename == None:
-            if self.name == None:
-                desc = "Cannot create route file (no DemandProfile name or filename given)."
-                raise_error(ValueError, desc, self.sim.curr_step)
-            else: filename = self.name
+            raise_error(KeyError, desc)
         
         if not filename.endswith(".rou.xml"): filename += ".rou.xml"
 
-        root = gfg.Element("routes", attrib={"xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
+        root = et.Element("routes", attrib={"xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
                                              "xsi:noNamespaceSchemaLocation": "http://sumo.dlr.de/xsd/routes_file.xsd"})
 
         if len(self._vehicle_types) > 0:
-            root.append(gfg.Comment(" VTypes "))
+
+            sumo_names = {'vehicle_class': 'vClass', 'colour': 'color', 'length': 'length', 'height': 'height', 'mass': 'mass',
+                          'speed_factor': 'speedFactor', 'speed_dev': 'speedDev', 'min_gap': 'minGap', 'acceleration': 'accel', 
+                          'deceleration': 'decel', 'tau': 'tau', 'max_lateral_speed': 'maxSpeedLat', 'gui_shape': 'guiShape'}
+
+            root.append(et.Comment(" VTypes "))
 
             for vehicle_type_id, vehicle_type_data in self._vehicle_types.items():
+                
                 attributes = {"id": vehicle_type_id}
-                attributes.update(vehicle_type_data)
-                root.append(gfg.Element("vType", attrib=attributes))
+                sumo_attributes = {sumo_names[name]: value for name, value in vehicle_type_data.items() if value != None}
+
+                if "color" in sumo_attributes:
+                    if sumo_attributes["color"] not in sumo_colours:
+                        colour = colour_to_rgba(sumo_attributes["color"], self.sim.curr_step)
+                        if isinstance(colour, (list, tuple)): colour = ",".join([str(val) for val in colour])
+                        sumo_attributes["color"] = colour
+
+                attributes.update(sumo_attributes)
+                root.append(et.Element("vType", attrib=attributes))
 
         if len(self._demand_arrs) > 0:
-            root.append(gfg.Comment(" Vehicles, persons and containers (sorted by depart) "))
+            root.append(et.Comment(" Vehicles, persons and containers (sorted by depart) "))
 
             idx = 0
             for demand_arr in self._demand_arrs:
@@ -117,11 +149,11 @@ class DemandProfile:
                 if vehicle_type_dists == None: vehicle_type_dists = [1] * len(vehicle_types)
                 
                 for vehicle_type, type_dist in zip(vehicle_types, vehicle_type_dists):
-                    attributes["id"] = f"{self.name}_{idx}" if self.name != None else f"flow_{idx}"
+                    attributes["id"] = f"flow_{idx}"
                     attributes["type"] = vehicle_type
                     attributes["vehsPerHour"] = str(vehs_per_hour * type_dist)
 
-                    root.append(gfg.Element("flow", attrib=attributes))
+                    root.append(et.Element("flow", attrib=attributes))
                     idx += 1
 
         _save_xml(root, filename)
@@ -134,7 +166,7 @@ class DemandProfile:
             `csv_file` (str): Demand file location
         """
 
-        csv_file = validate_type(csv_file, str, "demand file", self.sim.curr_step)
+        csv_file = validate_type(csv_file, str, "demand file")
         if csv_file.endswith(".csv"):
             if os.path.exists(csv_file):
                 with open(csv_file, "r") as fp:
@@ -151,7 +183,7 @@ class DemandProfile:
 
                             if len(set(row) - set(valid_cols)) != 0:
                                 desc = "Invalid demand file (unknown columns '{0}').".format("', '".join(list(set(row) - set(valid_cols))))
-                                raise_error(KeyError, desc, self.sim.curr_step)
+                                raise_error(KeyError, desc)
 
                             if "route_id" in row: demand_idxs["route_id"] = row.index("route_id")
                             elif "origin" in row and "destination" in row:
@@ -159,7 +191,7 @@ class DemandProfile:
                                 demand_idxs["destination"] = row.index("destination")
                             else:
                                 desc = "Invalid demand file (no routing values, must contain 'route_id' or 'origin/destination')."
-                                raise_error(KeyError, desc, self.sim.curr_step)
+                                raise_error(KeyError, desc)
                             
                             if "start_time" in row and "end_time" in row:
                                 demand_idxs["start_time"] = row.index("start_time")
@@ -169,13 +201,13 @@ class DemandProfile:
                                 demand_idxs["end_step"] = row.index("end_step")
                             else:
                                 desc = "Invalid demand file (no time values, must contain 'start_time/end_time' or 'start_step/end_step')."
-                                raise_error(KeyError, desc, self.sim.curr_step)
+                                raise_error(KeyError, desc)
 
                             if "demand" in row: demand_idxs["demand"] = row.index("demand")
                             elif "number" in row: demand_idxs["number"] = row.index("number")
                             else:
                                 desc = "Invalid demand file (no demand values, must contain 'demand/number')."
-                                raise_error(KeyError, desc, self.sim.curr_step)
+                                raise_error(KeyError, desc)
 
                             if "vehicle_types" in row:
                                 demand_idxs["vehicle_types"] = row.index("vehicle_types")
@@ -203,13 +235,13 @@ class DemandProfile:
                             else: routing = (row[demand_idxs["origin"]], row[demand_idxs["destination"]])
 
                             if "start_time" in demand_idxs: 
-                                step_range = (int(row[demand_idxs["start_time"]]) / self.sim.step_length, int(row[demand_idxs["end_time"]]) / self.sim.step_length)
+                                step_range = (int(row[demand_idxs["start_time"]]) / self.step_length, int(row[demand_idxs["end_time"]]) / self.step_length)
                             else: step_range = (int(row[demand_idxs["start_step"]]), int(row[demand_idxs["end_step"]]))
 
                             step_range = [int(val) for val in step_range]
 
                             # Convert to flow in vehicles/hour if using 'number'
-                            if "number" in demand_idxs: demand = int(row[demand_idxs["number"]]) / convert_units(step_range[1] - step_range[0], "steps", "hours", self.sim.step_length)
+                            if "number" in demand_idxs: demand = int(row[demand_idxs["number"]]) / convert_units(step_range[1] - step_range[0], "steps", "hours", self.step_length)
                             else: demand = float(row[demand_idxs["demand"]])
 
                             if "vehicle_types" in demand_idxs:
@@ -220,15 +252,14 @@ class DemandProfile:
                                 vehicle_types = "DEFAULT_VEHTYPE"
                                 if "vehicle_type_dists" in demand_idxs:
                                     desc = "vehicle_type_dists given without vehicle_types."
-                                    raise_error(ValueError, desc, self.sim.curr_step)
-
+                                    raise_error(ValueError, desc)
 
                             if isinstance(vehicle_types, (list, tuple)):
                                 if "vehicle_type_dists" in demand_idxs:
                                     vehicle_type_dists = row[demand_idxs["vehicle_type_dists"]].split(",")
                                     if len(vehicle_type_dists) != len(vehicle_types):
                                         desc = "Invalid vehicle_type_dists '[{0}]' (must be same length as vehicle_types '{1}').".format(", ".join(vehicle_type_dists), len(vehicle_types))
-                                        raise_error(ValueError, desc, self.sim.curr_step)
+                                        raise_error(ValueError, desc)
                                     else: vehicle_type_dists = [float(val) for val in vehicle_type_dists]
                                 else: vehicle_type_dists = 1 if isinstance(vehicle_types, str) else [1 / len(vehicle_types)]*len(vehicle_types)
                             else:
@@ -256,12 +287,10 @@ class DemandProfile:
                             
             else:
                 desc = "Demand file '{0}' not found.".format(csv_file)
-                raise_error(FileNotFoundError, desc, self.sim.curr_step)
+                raise_error(FileNotFoundError, desc)
         else:
             desc = "Invalid demand file '{0}' format (must be '.csv').".format(csv_file)
-            raise_error(ValueError, desc, self.sim.curr_step)
-
-        self._demand_files.append(csv_file)
+            raise_error(ValueError, desc)
 
     def add_demand(self, routing: str|list|tuple, step_range: list|tuple, demand: int|float, vehicle_types: str|list|tuple|None = None, vehicle_type_dists: list|tuple|None = None, initial_speed: str|int|float = "max", origin_lane: str|int|float = "best", origin_pos: str|int = "base", insertion_sd: float = 0.333) -> None:
         """
@@ -278,6 +307,10 @@ class DemandProfile:
             `origin_pos` (str, int): Longitudinal position at insertion, either ['_random_'|'_free_'|'_random_free_'|'_base_'|'_last_'|'_stop_'|'_splitFront_'] or offset
             `insertion_sd` (float): Vehicle insertion number standard deviation, at each step
         """
+
+        if self.sim == None:
+            desc = "No Simulation object found."
+            raise_error(KeyError, desc)
 
         routing = validate_type(routing, (str, list, tuple), "routing", self.sim.curr_step)
         if isinstance(routing, str) and not self.sim.route_exists(routing):
@@ -324,8 +357,6 @@ class DemandProfile:
         self.sim._manual_flow = True
         self._demand_arrs.append([routing, step_range, demand, vehicle_types, vehicle_type_dists, initial_speed, origin_lane, origin_pos, insertion_sd])
 
-        self._demand_arrs = sorted(self._demand_arrs, key=lambda row: row[1][0])
-
     def add_demand_function(self, routing: str|list|tuple, step_range: list|tuple, demand_function, parameters: dict|None = None, vehicle_types: str|list|tuple|None = None, vehicle_type_dists: list|tuple|None = None, initial_speed: str|int|float = "max", origin_lane: str|int|float = "best", origin_pos: str|int = "base", insertion_sd: float = 0.333) -> None:
         """
         Adds traffic flow demand calculated for each step using a 'demand_function'. 'step' is the only required parameter of the function.
@@ -365,11 +396,78 @@ class DemandProfile:
 
             self.add_demand(routing, (step_no, step_no), demand_val, vehicle_types, vehicle_type_dists, initial_speed, origin_lane, origin_pos, insertion_sd)
 
-def _save_xml(data, filename) -> None:
-    tree = gfg.ElementTree(data)
-    gfg.indent(tree, space="    ")
+    def remove_demand(self, start_step: int, end_step: int) -> None:
+        """
+        Removes all demand from the profile in the range [start_step, end_step] (inclusive).
 
-    xml_str = gfg.tostring(data, encoding="utf-8").decode()
+        Args:
+            `start_step` (int): Start step of the removal period
+            `end_step` (int): End step of the removal period
+        """
+
+        rm_start, rm_end = start_step * self.step_length, end_step * self.step_length
+
+        new_arrs = []
+        for demand_arr in self._demand_arrs:
+
+            arr_start, arr_end = demand_arr[1][0], demand_arr[1][1]
+            
+            if arr_start < rm_start and arr_end <= rm_end:
+                demand_arr[1][1] = rm_start - self.step_length
+            
+            elif arr_start >= rm_start and arr_end > rm_end:
+                demand_arr[1][0] = rm_end + self.step_length
+
+            elif arr_start >= rm_start and arr_end <= rm_end:
+                continue
+
+            elif arr_start < rm_start and arr_end > rm_end:
+
+                cp1 = copy.deepcopy(demand_arr)
+                cp1[1][1] = rm_start - self.step_length
+                new_arrs.append(cp1)
+
+                cp2 = copy.deepcopy(demand_arr)
+                cp2[1][0] = rm_end + self.step_length
+                new_arrs.append(cp2)
+
+                continue
+
+            new_arrs.append(copy.deepcopy(demand_arr))
+
+        self._demand_arrs = copy.deepcopy(new_arrs)
+
+    def save(self, filename: str, overwrite: bool = True) -> None:
+        """
+        Saves the demand profile to a serialised file.
+
+        Args:
+            `filename` (str): '.pkl' filename
+            `overwrite` (bool): Denotes whether to allow overwriting previous outputs
+        """
+        
+        if not filename.endswith('.pkl'): filename += ".pkl"
+
+        if os.path.exists(filename):
+            if overwrite and self.sim != None and not self.sim._suppress_warnings:
+                raise_warning(f"File '{filename}' already exists and will be overwritten.", self.sim.curr_step)
+            elif not overwrite:
+                desc = f"File '{filename}' already exists and cannot be overwritten."
+                raise_error(FileExistsError, desc, self.curr_step)
+        
+        dp_dict = self.__dict__.copy()
+        del dp_dict["sim"]
+        del dp_dict["id"]
+        del dp_dict["step_length"]
+
+        with open(filename, "wb") as fp:
+            pickle.dump(dp_dict, fp)
+
+def _save_xml(data, filename) -> None:
+    tree = et.ElementTree(data)
+    et.indent(tree, space="    ")
+
+    xml_str = et.tostring(data, encoding="utf-8").decode()
     with open(filename, "w") as fp:
         from .__init__ import __version__
         now = datetime.now()
