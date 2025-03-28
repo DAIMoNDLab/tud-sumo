@@ -2232,9 +2232,10 @@ class Plotter(_GenericPlotter):
 class MultiPlotter(_GenericPlotter):
     """ Visualisation class that plots TUD-SUMO data for multiple simulations. """
 
-    def __init__(self, scenario_label: str|None=None, units: str="metric", time_unit: str="seconds", sim_data_loc: str="", save_fig_loc: str="", save_fig_dpi: int=600, overwrite_figs: bool=True) -> None:
+    def __init__(self, groups_title: str|None=None, scenario_label: str|None=None, units: str="metric", time_unit: str="seconds", sim_data_loc: str="", save_fig_loc: str="", save_fig_dpi: int=600, overwrite_figs: bool=True) -> None:
         """
         Args:
+            `groups_title` (str, optional): Groups title (ie. 'Algorithm' label when comparing results of different algorithms)
             `scenario_label` (str, optional): Scenario label added to the beginning of all plot titles
             `units` (str): Simulation data units, must match all added simulations (must be ['_metric_'|'_imperial_'|'_uk_'])
             `time_unit` (str): Plotting time unit used for all plots (must be ['_steps_'|'_seconds_'|'_minutes_'|'_hours_'])
@@ -2254,6 +2255,7 @@ class MultiPlotter(_GenericPlotter):
         else: self.scenario_label = ""
 
         self.sim_data_loc = sim_data_loc
+        self.groups_title = groups_title
         
         super().__init__(units, time_unit, save_fig_loc, save_fig_dpi, overwrite_figs)
 
@@ -2418,7 +2420,7 @@ class MultiPlotter(_GenericPlotter):
             fig_title = self.scenario_label + fig_title
         ax.set_title(fig_title, pad=20)
 
-        if plotted > 1: ax.legend(shadow=True)
+        if plotted > 1: ax.legend(title=self.groups_title, shadow=True)
         ax.set_xlabel(self._default_labels["sim_time"])
         ax.set_ylabel(self._default_labels[data_key])
         ax.set_xlim(x_lim)
@@ -2495,7 +2497,7 @@ class MultiPlotter(_GenericPlotter):
             fig_title = self.scenario_label + fig_title
         ax.set_title(fig_title, pad=20)
 
-        if plotted > 1: ax.legend(shadow=True)
+        if plotted > 1: ax.legend(title=self.groups_title, shadow=True)
         ax.set_xlabel(self._default_labels["sim_time"])
         ax.set_ylabel(self._default_labels[data_key])
         ax.set_xlim(x_lim)
@@ -2573,7 +2575,7 @@ class MultiPlotter(_GenericPlotter):
             fig_title = self.scenario_label + fig_title
         ax.set_title(fig_title, pad=20)
 
-        if plotted > 1: ax.legend(shadow=True)
+        if plotted > 1: ax.legend(title=self.groups_title, shadow=True)
         ax.set_xlabel(self._default_labels["sim_time"])
         ax.set_ylabel(self._default_labels[data_key])
         ax.set_xlim(x_lim)
@@ -2629,7 +2631,7 @@ class MultiPlotter(_GenericPlotter):
             else: fig_title = "{0}'{1}' → '{2}' Trip Throughput".format(self.scenario_label, od_pair[0], od_pair[1])
         ax.set_title(fig_title, pad=20)
 
-        if plotted > 1: ax.legend(shadow=True)
+        if plotted > 1: ax.legend(title=self.groups_title, shadow=True)
         ax.set_xlabel(self._default_labels["sim_time"])
         ax.set_ylabel(self._default_labels["throughput"])
         ax.set_xlim(x_lim)
@@ -2718,7 +2720,7 @@ class MultiPlotter(_GenericPlotter):
         if fig_title != "": ax.set_title(fig_title, pad=20)
         ax.legend(shadow=True)
 
-        if plotted > 1: ax.legend(shadow=True)
+        if plotted > 1: ax.legend(title=self.groups_title, shadow=True)
         ax.set_xlabel(self._default_labels["sim_time"])
         ax.set_ylabel("Metering Rate (veh/hr)")
         ax.set_xlim(x_lim)
@@ -2801,6 +2803,7 @@ class MultiPlotter(_GenericPlotter):
             ax.bar(plot_groups, plt_data, color=colours, zorder=3, label=plot_groups)
             ax.tick_params(axis='x', labelrotation=45)
 
+        if self.groups_title != None: ax.set_xlabel(self.groups_title)
         ax.set_ylabel(self._default_labels["vehicle_counts"])
         fig_title = f"{self.scenario_label}'{rm_id}' Average Queue Length" if not isinstance(fig_title, str) else fig_title
         if fig_title != "": ax.set_title(fig_title, pad=20)
@@ -2873,6 +2876,7 @@ class MultiPlotter(_GenericPlotter):
             ax.bar(plot_groups, plt_data, color=colours, zorder=3, label=plot_groups)
             ax.tick_params(axis='x', labelrotation=45)
 
+        if self.groups_title != None: ax.set_xlabel(self.groups_title)
         ax.set_ylabel(self._default_labels[data_key])
         fig_title = f"{self.scenario_label}Network-wide {self._default_titles[data_key]}" if not isinstance(fig_title, str) else fig_title
         if fig_title != "": ax.set_title(fig_title, pad=20)

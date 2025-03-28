@@ -505,7 +505,9 @@ class Simulation:
         if self._manual_flow and len(self._demand_profiles) > 0:
 
             for demand_profile in self._demand_profiles.values():
-            
+                
+                if not demand_profile.active: continue
+                
                 for demand_arr in demand_profile._demand_arrs:
                     step_range = demand_arr[1]
                     if self.curr_step < step_range[0]: continue
@@ -4490,7 +4492,7 @@ def print_summary(sim_data: dict|str, save_file: str|None=None, tab_width: int=5
     tertiary_delineator = " * "+"-"*tab_width+" *"
     
     print(primary_delineator)
-    _table_print(f"TUD-SUMO v{sim_data["tuds_version"]}")
+    _table_print(f"TUD-SUMO v{sim_data["tuds_version"]}", tab_width)
 
     print(primary_delineator)
     _table_print(sim_data["scenario_name"], tab_width)

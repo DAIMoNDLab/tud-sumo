@@ -21,12 +21,22 @@ class DemandProfile:
 
         self._vehicle_types = {}
 
+        self.active = True
+
     def __name__(self): return "DemandProfile"
 
     def _generate_id(self, n: int=10): 
         """ Generates random ID of length 'n'."""
 
         return ''.join(rnd.choice(string.ascii_uppercase + string.digits) for _ in range(n))
+
+    def activate(self) -> None:
+        """ Activate the demand profile. """
+        self.active = True
+
+    def deactivate(self) -> None:
+        """ Deactivate the demand profile. """
+        self.active = False
 
     def remove(self) -> None:
         """ Removes the profile from its corresponding simulation. """
