@@ -729,7 +729,7 @@ class Plotter(_GenericPlotter):
         fig.tight_layout()
         self._display_figure(save_fig)
 
-    def plot_rm_queuing(self, rm_id: str, ax=None, yax_labels: bool|list|tuple=True, xax_labels: bool=True, plot_delay: bool=True, cumulative_delay: bool=False, time_range: list|tuple|None=None, show_events: str|list|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_rm_queuing(self, rm_id: str, ax=None, yax_labels: bool|list|tuple=True, xax_labels: bool=True, pct_capacity: bool=False, plot_delay: bool=False, cumulative_delay: bool=False, time_range: list|tuple|None=None, show_events: str|list|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
         """
         Plot ramp metering rate.
         
@@ -738,6 +738,7 @@ class Plotter(_GenericPlotter):
             `ax` (matplotlib.axes, optional): Matplotlib axis, used when creating subplots
             `yax_labels` (bool, list, tuple): Bool denoting whether to include y-axis labels (for subplots). Either single bool for both y-axis labels or list of two bools to set both y-axes (when plotting delay).
             `xax_labels` (bool): Bool denoting whether to include x-axis labels (for subplots)
+            `pct_capacity` (bool): Bool denoting whether to plot queue length as a percentage of capacity (if max_queue known)
             `plot_delay` (bool): Bool denoting whether to plot queue delay. This will be done on the same plot with a separate y-axis.
             `cumulative_delay` (bool): Bool denoting whether to plot cumulative delay
             `time_range` (list, tuple, optional): Plotting time range (in plotter class units)
@@ -760,6 +761,7 @@ class Plotter(_GenericPlotter):
                 if tl.measure_queues:
                     queue_lengths = tl.queue_lengths
                     queue_delays = tl.queue_delays
+                    max_queue = tl.max_queue
                 else:
                     desc = "Meter '{0}' does not track queue lengths (no queue detector).".format(rm_id)
                     raise_error(ValueError, desc)
@@ -771,7 +773,12 @@ class Plotter(_GenericPlotter):
             if "meter" in self.sim_data["data"]["junctions"][rm_id].keys():
                 if "queue_lengths" in self.sim_data["data"]["junctions"][rm_id]["meter"].keys():
                     queue_lengths = self.sim_data["data"]["junctions"][rm_id]["meter"]["queue_lengths"]
-                    queue_delays = self.sim_data["data"]["junctions"][rm_id]["meter"]["queue_delays"]
+                    if "queue_delays" in self.sim_data["data"]["junctions"][rm_id]["meter"]:
+                        queue_delays = self.sim_data["data"]["junctions"][rm_id]["meter"]["queue_delays"]
+                    else: queue_delays = None
+                    if "max_queue" in self.sim_data["data"]["junctions"][rm_id]["meter"]:
+                        max_queue = self.sim_data["data"]["junctions"][rm_id]["meter"]["max_queue"]
+                    else: max_queue = None
                 else:
                     desc = "Meter '{0}' has not tracked queue lengths (no queue detector).".format(rm_id)
                     raise_error(ValueError, desc)
@@ -780,6 +787,10 @@ class Plotter(_GenericPlotter):
                 raise_error(ValueError, desc)
         else:
             desc = "Junction '{0}' not found in tracked junctions.".format(rm_id)
+            raise_error(KeyError, desc)
+
+        if plot_delay and queue_delays == None:
+            desc = f"Meter '{rm_id} has not tracked queue delay (no ramp edges)."
             raise_error(KeyError, desc)
 
         start, end, step = self.sim_data["start"], self.sim_data["end"], self.sim_data["step_len"]
@@ -791,17 +802,31 @@ class Plotter(_GenericPlotter):
         colour = self.CYAAN
         all_data_time_vals = convert_units([x for x in range(start, end)], "steps", self.time_unit, step)
         data_time_vals, queue_lengths = limit_vals_by_range(all_data_time_vals, queue_lengths, time_range)
+
+        if max_queue != None:
+            
+            if pct_capacity:
+                queue_lengths = [val / max_queue * 100 for val in queue_lengths]
+                ax1.set_ylim([0, 105])
+                def_y_label = "Queue Length (% of Capacity)"
+            else: 
+                ax1.axhline(max_queue, label="Max Length", color=self.DONKERGROEN, linestyle="--", zorder=10)
+                ax1.set_ylim([0, get_axis_lim(max_queue)])
+                ax1.legend(shadow=True)
+                def_y_label = "Queue Length (No. of Vehicles)"
+        
+        else: ax1.set_ylim([0, get_axis_lim(queue_lengths)])
+
         ax1.plot(data_time_vals, queue_lengths, linewidth=1, zorder=3, color=colour)
         if xax_labels: ax1.set_xlabel(self._default_labels["sim_time"])
         if (isinstance(yax_labels, bool) and yax_labels) or (isinstance(yax_labels, (list, tuple)) and len(yax_labels) == 2 and yax_labels[0]):
-            ax1.set_ylabel("No. of On-ramp Vehicles")
+            ax1.set_ylabel(def_y_label)
         else:
             desc = "Invalid yax_label, must be bool or list of 2 bools denoting each axis."
             raise_error(TypeError, desc)
 
         if time_range == None: time_range = [-math.inf, math.inf]
         ax1.set_xlim([max(time_range[0], data_time_vals[0]), min(time_range[1], data_time_vals[-1])])
-        ax1.set_ylim([0, get_axis_lim(queue_lengths)])
 
         ax1.grid(True, 'both', color='grey', linestyle='-', linewidth=0.5)
         if not is_subplot or fig_title != None:
@@ -817,7 +842,7 @@ class Plotter(_GenericPlotter):
         if plot_delay:
             ax1.tick_params(axis='y', labelcolor=colour)
             if (isinstance(yax_labels, bool) and yax_labels) or (isinstance(yax_labels, (list, tuple)) and len(yax_labels) == 2 and yax_labels[0]):
-                ax1.set_ylabel("No. of On-ramp Vehicles", color=colour)
+                ax1.set_ylabel(def_y_label, color=colour)
         
             colour = self.ROOD
             data_time_vals, queue_delays = limit_vals_by_range(all_data_time_vals, queue_delays, time_range)

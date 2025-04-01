@@ -4107,7 +4107,6 @@ class TrackedJunction:
         self.curr_time = self.sim.curr_step
 
         self.track_flow = False
-        self.measure_spillback = False
         self.measure_queues = False
         self.is_meter = False
         self.has_tl = junc_id in self.sim._all_tls
@@ -4166,7 +4165,7 @@ class TrackedJunction:
                 meter_params = junc_params["meter_params"]
 
                 valid_params = {"min_rate": (int, float), "max_rate": (int, float), "ramp_edges": (list, tuple),
-                                "queue_detector": str, "init_rate": (int, float)}
+                                "queue_detector": str, "init_rate": (int, float), "max_queue": int}
                 error, desc = test_input_dict(meter_params, valid_params, "'{0}' meter".format(self.id), required=["min_rate", "max_rate"])
                 if error != None: raise_error(error, desc, self.sim.curr_step)
 
@@ -4178,20 +4177,22 @@ class TrackedJunction:
 
                 self.queue_detector = None
                 self.ramp_edges = None
+                self.max_queue = None
 
-                self.queue_lengths, self.queue_delays = [], []
+                self.queue_lengths, self.queue_delays = [], None
 
                 if "ramp_edges" in meter_params.keys():
                     self.ramp_edges = meter_params["ramp_edges"]
-
+                    self._ramp_length = 0
                     for edge in self.ramp_edges:
                         if edge not in self.sim._all_edges:
                             desc = "Edge ID '{0}' not found.".format(edge)
                             raise_error(KeyError, desc, self.sim.curr_step)
+                        else: self._ramp_length += self.sim.get_geometry_vals(edge, "length")
 
-                    self.measure_spillback, self.spillback_vehs = True, []
                     self.measure_queues, self.queue_detector = True, None
-                    self.curr_queuing = set([])
+
+                    self.queue_delays = []
 
                 if not self.measure_queues:
                     if "queue_detector" in meter_params.keys():
@@ -4206,6 +4207,8 @@ class TrackedJunction:
 
                 if "init_rate" in meter_params.keys(): self.sim.set_tl_metering_rate(self.id, meter_params["init_rate"])
                 else: self.sim.set_tl_metering_rate(self.id, self.max_rate)
+
+                if "max_queue" in meter_params.keys(): self.max_queue = meter_params["max_queue"]
 
             else: self.is_meter = False
     
@@ -4229,10 +4232,9 @@ class TrackedJunction:
             
             if self.measure_queues:
                 junc_dict["meter"]["queue_lengths"] = self.queue_lengths
-                junc_dict["meter"]["queue_delays"] = self.queue_delays
+                if self.ramp_edges != None: junc_dict["meter"]["queue_delays"] = self.queue_delays
 
-            if self.measure_spillback:
-                junc_dict["meter"]["spillback_vehs"] = self.spillback_vehs
+            if self.max_queue != None: junc_dict["meter"]["max_queue"] = self.max_queue
 
             junc_dict["meter"]["min_rate"] = self.min_rate
             junc_dict["meter"]["max_rate"] = self.max_rate
@@ -4261,10 +4263,7 @@ class TrackedJunction:
 
             if self.measure_queues:
                 self.queue_lengths = []
-                self.queue_delays = []
-
-            if self.measure_spillback:
-                self.spillback_vehs = []
+                if self.ramp_edges != None: self.queue_delays = []
 
     def update(self, keep_data: bool = True) -> None:
         """
@@ -4319,29 +4318,41 @@ class TrackedJunction:
 
                 if self.ramp_edges != None:
                     queuing_vehicles = self.sim.get_last_step_geometry_vehicles(self.ramp_edges, flatten=True)
+                    queuing_vehicles = [veh_id for veh_id in queuing_vehicles if self.sim.vehicle_exists(veh_id)]
+                    vehicle_data = self.sim.get_vehicle_vals(queuing_vehicles, ["speed", "allowed_speed"])
+
+                    if len(queuing_vehicles) > 1:
+                        speeds = [data["speed"] for data in vehicle_data.values()]
+                        allowed_speeds = [data["allowed_speed"] for data in vehicle_data.values()]
+                    elif len(queuing_vehicles) == 1:
+                        speeds = [vehicle_data["speed"]]
+                        allowed_speeds = [vehicle_data["allowed_speed"]]
+                    else: speeds, allowed_speeds = [], []
+
+                    self.queue_lengths.append(len([veh_id for veh_id in queuing_vehicles if self.sim.get_vehicle_vals(veh_id, "is_stopped")]))
+
+                    if len(queuing_vehicles) > 0:
+                        avg_speed = sum(speeds) / len(speeds)
+                        ff_speed = sum(allowed_speeds) / len(allowed_speeds)
+
+                        if avg_speed == 0: self.queue_delays.append(len(speeds))
+                        elif avg_speed >= ff_speed: self.queue_delays.append(0)
+                        else:
+                            ramp_length = convert_units(self._ramp_length, self.sim._l_dist_unit, "metres")
+                            flow = (avg_speed * (len(queuing_vehicles) / ramp_length)) * self.sim.step_length
+                            self.queue_delays.append(flow * ((ramp_length / avg_speed) - (ramp_length / ff_speed)))
+
+                    else: self.queue_delays.append(0)
                 
                 elif self.queue_detector != None:
                     queuing_vehicles = self.sim.get_last_step_detector_vehicles(self.queue_detector, flatten=True)
+                    queuing_vehicles = [veh_id for veh_id in queuing_vehicles if self.sim.vehicle_exists(veh_id)]
+                    num_stopped = len([veh_id for veh_id in queuing_vehicles if self.sim.get_vehicle_vals(veh_id, "is_stopped")])
+                    self.queue_lengths.append(num_stopped)
 
                 else:
                     desc = "Cannot update meter '{0}' queue length (no detector or entry/exit edges)".format(self.id)
                     raise_error(KeyError, desc, self.sim.curr_step)
-
-                self.queue_lengths.append(len(queuing_vehicles))
-                queuing_vehicles = [veh_id for veh_id in queuing_vehicles if self.sim.vehicle_exists(veh_id)]
-                num_stopped = len([veh_id for veh_id in queuing_vehicles if self.sim.get_vehicle_vals(veh_id, "is_stopped")])
-                self.queue_delays.append(num_stopped * self.sim.step_length)
-
-            if self.measure_spillback:
-                spillback_vehs, all_waiting_vehs = 0, 0
-                all_loaded_vehicles = self.sim._all_loaded_vehicle_ids
-                for veh_id in all_loaded_vehicles:
-                    if not self.sim.vehicle_departed(veh_id):
-                        if traci.vehicle.getRoute(veh_id)[0] == self.ramp_edges[0]:
-                            spillback_vehs += 1
-                        all_waiting_vehs += 1
-
-                self.spillback_vehs.append(spillback_vehs)
 
 class TrackedEdge:
     """ Edge object with automatic data collection. """
