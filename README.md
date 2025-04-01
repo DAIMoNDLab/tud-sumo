@@ -20,7 +20,7 @@
   </a>
 </p>
 
-Python SUMO wrapper, using traci, written for the DAIMoND Lab at TU Delft by Callum Evans. The full documentation & examples can be found at [tud-sumo.github.io/docs/](https://tud-sumo.github.io/docs/). Example code can be found at [github.com/DAIMoNDLab/tud-sumo-examples](https://github.com/DAIMoNDLab/tud-sumo-examples).<br><br>
+A research-oriented wrapper for SUMO<sup>[1]</sup> in python, developed for the DAIMoND lab at the Technische Universiteit Delft (TUD), the Netherlands. The full documentation & examples can be found at [tud-sumo.github.io/docs/](https://tud-sumo.github.io/docs/). Example code can be found at [github.com/DAIMoNDLab/tud-sumo-examples](https://github.com/DAIMoNDLab/tud-sumo-examples).<br><br>
 
 ![logos](https://github.com/DAIMoNDLab/tud-sumo/raw/main/img/logos.png?raw=true)
 
@@ -35,3 +35,7 @@ TUD-SUMO is developed in the DAIMoND lab of TU Delft. For any questions or feedb
 ## Acknowledgements
 
 TUD-SUMO is part of the research under the project "_AI in Network Management_," funded by Rijkswaterstaat, grant agreement nr. 31179439, under the label of ITS Edulab.
+
+## Citations
+
+  1. "_Microscopic Traffic Simulation using SUMO_"; Pablo Alvarez Lopez, Michael Behrisch, Laura Bieker-Walz, Jakob Erdmann, Yun-Pang Flötteröd, Robert Hilbrich, Leonhard Lücken, Johannes Rummel, Peter Wagner, and Evamarie Wießner. _IEEE Intelligent Transportation Systems Conference (ITSC)_, 2018.

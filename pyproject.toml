@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "tud-sumo"
 dynamic = ["version"]
-description = "TU Delft SUMO wrapper"
+description = "A Research-oriented wrapper for SUMO developed at TU Delft"
 readme = "README.md"
 authors = [{ name = "Callum Evans", email = "c.evans@tudelft.nl" }]
 license = { file = "LICENSE" }
