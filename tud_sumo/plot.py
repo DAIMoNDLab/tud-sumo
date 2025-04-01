@@ -1525,7 +1525,7 @@ class Plotter(_GenericPlotter):
                         if prev_line == None:
                             colour, line_style = self._get_colour("WHEEL", edge_idx==0)
                             prev_line, label = ax.plot(convert_units(x_vals, "steps", self.time_unit, step), y_vals, color=colour, linestyle=line_style, label=label, linewidth=1), None
-                        else: prev_line = ax.plot(convert_units(x_vals, "steps", self.time_unit, step), y_vals, color=prev_line[0].get_color(), line_style=prev_line[0].get_linestyle(), label=label, linewidth=1)
+                        else: prev_line = ax.plot(convert_units(x_vals, "steps", self.time_unit, step), y_vals, color=prev_line[0].get_color(), linestyle=prev_line[0].get_linestyle(), label=label, linewidth=1)
                         x_vals, y_vals = [], []
                 else:
                     x_vals.append(curr_time)
@@ -1536,7 +1536,7 @@ class Plotter(_GenericPlotter):
             if len(x_vals) != 0 and len(y_vals) != 0:
                 colour, line_style = self._get_colour("WHEEL", edge_idx==0)
                 if prev_line == None: prev_line = ax.plot(convert_units(x_vals, "steps", self.time_unit, step), y_vals, color=colour, linestyle=line_style, label=label, linewidth=1)
-                else: prev_line = ax.plot(convert_units(x_vals, "steps", self.time_unit, step), y_vals, color=prev_line[0].get_color(), line_style=prev_line[0].get_linestyle(), label=label, linewidth=1)
+                else: prev_line = ax.plot(convert_units(x_vals, "steps", self.time_unit, step), y_vals, color=prev_line[0].get_color(), linestyle=prev_line[0].get_linestyle(), label=label, linewidth=1)
 
         self._plot_event(ax, show_events)
 
