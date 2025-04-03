@@ -67,25 +67,26 @@ class DemandProfile:
         plt.plot_demand(routing, self, save_fig=save_fig)
         del plt
 
-    def add_vehicle_type(self, vehicle_type_id: str, vehicle_class: str="passenger", colour: str|list|tuple|None = None, length: int|float|None = None, width: int|float|None = None, height: int|float|None = None, mass: int|float|None = None, speed_factor: int|float|None = None, speed_dev: int|float|None = None, min_gap: int|float|None = None, acceleration: int|float|None = None, deceleration: int|float|None = None, tau: int|float|None = None, max_lateral_speed: int|float|None = None, gui_shape: str|None = None) -> None:
+    def add_vehicle_type(self, vehicle_type_id: str, vehicle_class: str="passenger", colour: str|list|tuple|None = None, length: int|float|None = None, width: int|float|None = None, height: int|float|None = None, max_speed: int|float|None = None, speed_factor: int|float|None = None, speed_dev: int|float|None = None, min_gap: int|float|None = None, acceleration: int|float|None = None, deceleration: int|float|None = None, tau: int|float|None = None, max_lateral_speed: int|float|None = None, emission_class: str|None = None, gui_shape: str|None = None) -> None:
         """
         Adds a new vehicle type to the simulation.
 
         Args:
             `vehicle_type_id` (str): ID for the new vehicle type
-            `vehicle_class` (str): Vehicle class (defaults to passenger)
-            `colour` (str, list, tuple, optional): Vehicle type colour, either hex code or list of rgb/rgba values
-            `length` (int, float, optional): Length of vehicle in metres/feet
-            `width` (int, float, optional): Width of vehicle in metres/feet
-            `height` (int, float, optional): Height of vehicle in metres/feet
-            `mass` (int, float, optional): Mass of vehicle in kilograms
-            `speed_factor` (int, float, optional): Vehicle type multiplier for lane speed limits
-            `speed_dev` (int, float, optional): Vehicle type deviation of the speed factor
-            `min_gap` (int, float, optional): Minimum gap after leader (m)
-            `acceleration` (int, float, optional): Vehicle type acceleration ability (m/s^2)
-            `deceleration` (int, float, optional): Vehicle type deceleration ability (m/s^2)
-            `tau` (int, float, optional): Car following model parameter
-            `max_lateral_speed` (int, float, optional): Maximum lateral speed (m/s)
+            `vehicle_class` (str, optional): Vehicle class (defaults to passenger)
+            `colour` (str, list, tuple, optional): Vehicle colour, either hex code, list of rgb/rgba values or valid SUMO colour string
+            `length` (int, float, optional): Vehicle length in metres/feet
+            `width` (int, float, optional): Vehicle width in metres/feet
+            `height` (int, float, optional): Vehicle height in metres/feet
+            `max_speed` (int, float, optional): Vehicle max speed in km/h or mph
+            `speed_factor` (int, float, optional): Vehicle speed multiplier
+            `speed_dev` (int, float, optional): Vehicle deviation from speed factor
+            `min_gap` (int, float, optional): Minimum gap behind leader
+            `acceleration` (int, float, optional): Maximum vehicle acceleration
+            `deceleration` (int, float, optional): Maximum vehicle deceleration
+            `tau` (int, float, optional): Vehicle car following parameter
+            `max_lateral_speed` (int, float, optional): Maximum lateral speed when lane changing
+            `emission_class` (str, optional): Vehicle emissions class ID
             `gui_shape` (str, optional): Vehicle shape in GUI (defaults to vehicle class name)
         """
 
@@ -93,11 +94,7 @@ class DemandProfile:
             desc = "No Simulation object found."
             raise_error(KeyError, desc)
 
-        values = ['vehicle_class', 'colour', 'length', 'height', 'mass',
-                  'speed_factor', 'speed_dev', 'min_gap', 'acceleration',
-                  'deceleration', 'tau', 'max_lateral_speed', 'gui_shape']
-        
-        vehicle_type_data = {name: locals()[name] for name in values}
+        vehicle_type_data = {name: locals()[name] for name in valid_vehicle_type_val_keys if locals()[name] != None}
 
         self.sim.add_vehicle_type(vehicle_type_id, **vehicle_type_data)
         self._vehicle_types[vehicle_type_id] = vehicle_type_data
@@ -122,8 +119,9 @@ class DemandProfile:
         if len(self._vehicle_types) > 0:
 
             sumo_names = {'vehicle_class': 'vClass', 'colour': 'color', 'length': 'length', 'height': 'height', 'mass': 'mass',
-                          'speed_factor': 'speedFactor', 'speed_dev': 'speedDev', 'min_gap': 'minGap', 'acceleration': 'accel', 
-                          'deceleration': 'decel', 'tau': 'tau', 'max_lateral_speed': 'maxSpeedLat', 'gui_shape': 'guiShape'}
+                          'speed_factor': 'speedFactor', 'speed_dev': 'speedDev', 'min_gap': 'minGap', 'acceleration': 'accel',
+                          'deceleration': 'decel', 'tau': 'tau', 'max_lateral_speed': 'maxSpeedLat',  'emission_class': "emissionClass",
+                          'gui_shape': 'guiShape'}
 
             root.append(et.Comment(" VTypes "))
 

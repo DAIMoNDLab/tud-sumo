@@ -293,7 +293,7 @@ class Plotter(_GenericPlotter):
                 desc = "Junction '{0}' not found in tracked junctions.".format(junc_id)
                 raise_error(KeyError, desc)
 
-            if tl.track_flow: junc_flows = tl.__dict__()["flows"]
+            if tl._track_flow: junc_flows = tl.__dict__()["flows"]
             else:
                 desc = "No traffic light at junction '{0}'.".format(junc_id)
                 raise_error(ValueError, desc)
@@ -374,7 +374,7 @@ class Plotter(_GenericPlotter):
                 desc = "Junction '{0}' not found in tracked junctions.".format(tl_id)
                 raise_error(KeyError, desc)
 
-            if tl.has_tl: tl_durs = deepcopy(tl.durations)
+            if tl._has_tl: tl_durs = deepcopy(tl._durations)
             else:
                 desc = "No traffic light at junction '{0}'.".format(tl_id)
                 raise_error(ValueError, desc)
@@ -523,9 +523,9 @@ class Plotter(_GenericPlotter):
                 desc = "Junction '{0}' not found in tracked junctions.".format(rm_id)
                 raise_error(KeyError, desc)
 
-            if tl.is_meter:
-                rates = tl.metering_rates
-                times = tl.rate_times
+            if tl._is_meter:
+                rates = tl._metering_rates
+                times = tl._rate_times
                 min_r, max_r = tl.min_rate, tl.max_rate
             else:
                 desc = "Junction '{0}' is not tracked as a meter.".format(rm_id)
@@ -757,10 +757,10 @@ class Plotter(_GenericPlotter):
                 desc = "Junction '{0}' not found in tracked junctions.".format(rm_id)
                 raise_error(KeyError, desc)
 
-            if tl.is_meter: 
-                if tl.measure_queues:
-                    queue_lengths = tl.queue_lengths
-                    queue_delays = tl.queue_delays
+            if tl._is_meter: 
+                if tl._measure_queues:
+                    queue_lengths = tl._queue_lengths
+                    queue_delays = tl._queue_delays
                     max_queue = tl.max_queue
                 else:
                     desc = "Meter '{0}' does not track queue lengths (no queue detector).".format(rm_id)

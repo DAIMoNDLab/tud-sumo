@@ -234,14 +234,17 @@ class Simulation:
                 self._speed_unit = "kmph"
                 self._l_dist_unit = "kilometres"
                 self._s_dist_unit = "metres"
+                self._weight_unit = "kilograms"
             case "IMPERIAL":
                 self._speed_unit = "mph"
                 self._l_dist_unit = "miles"
                 self._s_dist_unit = "feet"
+                self._weight_unit = "pounds"
             case "UK":
                 self._speed_unit = "mph"
                 self._l_dist_unit = "kilometres"
                 self._s_dist_unit = "metres"
+                self._weight_unit = "kilograms"
         
         self._all_juncs = list(traci.junction.getIDList())
         self._all_tls = list(traci.trafficlight.getIDList())
@@ -331,7 +334,7 @@ class Simulation:
         if self._junc_phases != None:
             junc_phases = {}
             for junc_id, phase_dict in self._junc_phases.items():
-                if junc_id in self.tracked_junctions and self.tracked_junctions[junc_id].is_meter: continue
+                if junc_id in self.tracked_junctions and self.tracked_junctions[junc_id]._is_meter: continue
                 junc_phases[junc_id] = {key: phase_dict[key] for key in ["phases", "times"]}
             if len(junc_phases) > 0:
                 object_params["phases"] = junc_phases
@@ -557,25 +560,26 @@ class Simulation:
             desc = "Cannot add flow manually (no demand profiles)."
             raise_warning(desc, self.curr_step)
 
-    def add_vehicle_type(self, vehicle_type_id: str, vehicle_class: str="passenger", colour: str|list|tuple|None = None, length: int|float|None = None, width: int|float|None = None, height: int|float|None = None, mass: int|float|None = None, speed_factor: int|float|None = None, speed_dev: int|float|None = None, min_gap: int|float|None = None, acceleration: int|float|None = None, deceleration: int|float|None = None, tau: int|float|None = None, max_lateral_speed: int|float|None = None, gui_shape: str|None = None) -> None:
+    def add_vehicle_type(self, vehicle_type_id: str, vehicle_class: str="passenger", colour: str|list|tuple|None = None, length: int|float|None = None, width: int|float|None = None, height: int|float|None = None, max_speed: int|float|None = None, speed_factor: int|float|None = None, speed_dev: int|float|None = None, min_gap: int|float|None = None, acceleration: int|float|None = None, deceleration: int|float|None = None, tau: int|float|None = None, max_lateral_speed: int|float|None = None, emission_class: str|None = None, gui_shape: str|None = None) -> None:
         """
         Adds a new vehicle type to the simulation.
 
         Args:
             `vehicle_type_id` (str): ID for the new vehicle type
-            `vehicle_class` (str): Vehicle class (defaults to passenger)
-            `colour` (str, list, tuple, optional): Vehicle type colour, either hex code, list of rgb/rgba values or valid SUMO colour string
-            `length` (int, float, optional): Length of vehicle in metres/feet
-            `width` (int, float, optional): Width of vehicle in metres/feet
-            `height` (int, float, optional): Height of vehicle in metres/feet
-            `mass` (int, float, optional): Mass of vehicle in kilograms
-            `speed_factor` (int, float, optional): Vehicle type multiplier for lane speed limits
-            `speed_dev` (int, float, optional): Vehicle type deviation of the speed factor
-            `min_gap` (int, float, optional): Minimum gap after leader (m)
-            `acceleration` (int, float, optional): Vehicle type acceleration ability (m/s^2)
-            `deceleration` (int, float, optional): Vehicle type deceleration ability (m/s^2)
-            `tau` (int, float, optional): Car following model parameter
-            `max_lateral_speed` (int, float, optional): Maximum lateral speed (m/s)
+            `vehicle_class` (str, optional): Vehicle class (defaults to passenger)
+            `colour` (str, list, tuple, optional): Vehicle colour, either hex code, list of rgb/rgba values or valid SUMO colour string
+            `length` (int, float, optional): Vehicle length in metres/feet
+            `width` (int, float, optional): Vehicle width in metres/feet
+            `height` (int, float, optional): Vehicle height in metres/feet
+            `max_speed` (int, float, optional): Vehicle max speed in km/h or mph
+            `speed_factor` (int, float, optional): Vehicle speed multiplier
+            `speed_dev` (int, float, optional): Vehicle deviation from speed factor
+            `min_gap` (int, float, optional): Minimum gap behind leader
+            `acceleration` (int, float, optional): Maximum vehicle acceleration
+            `deceleration` (int, float, optional): Maximum vehicle deceleration
+            `tau` (int, float, optional): Vehicle car following parameter
+            `max_lateral_speed` (int, float, optional): Maximum lateral speed when lane changing
+            `emission_class` (str, optional): Vehicle emissions class ID
             `gui_shape` (str, optional): Vehicle shape in GUI (defaults to vehicle class name)
         """
         
@@ -584,62 +588,30 @@ class Simulation:
             raise_error(KeyError, desc, self.curr_step)
 
         traci.vehicletype.copy('DEFAULT_VEHTYPE', vehicle_type_id)
-        traci.vehicletype.setVehicleClass(vehicle_type_id, vehicle_class)
-        
-        if self._gui:
-
-            gui_shape = vehicle_class if gui_shape == None else gui_shape
-            traci.vehicletype.setShapeClass(vehicle_type_id, gui_shape)
-
-            colour = colour_to_rgba(colour)
-            traci.vehicletype.setColor(vehicle_type_id, colour)
-
-        values = [length, height, mass, speed_factor, speed_dev, min_gap, acceleration, deceleration, tau, max_lateral_speed]
-        labels = ['length', 'height', 'mass', 'speed_factor', 'speed_dev', 'min_gap', 'acceleration', 'deceleration', 'tau', 'max_lateral_speed']
-        min_vals = [0.1, 0.1, 0.1, 0.1, 0.1, 0, 0, 0, 0, 0]
-        for value, min_val, label in zip(values, min_vals, labels):
-            if isinstance(value, (int, float)):
-                if value < min_val:
-                    desc = f"Invalid {label} '{value}' (must be >= {min_val})."
-                    raise_error(ValueError, desc, self.curr_step)
-            elif value != None:
-                desc = f"Invalid {label} '{value}' (must be [int|float], not '{type(value).__name__}')."
-                raise_error(TypeError, desc, self.curr_step)
-
-        if isinstance(length, (int, float)):
-            traci.vehicletype.setLength(vehicle_type_id, convert_units(length, "metres", self._s_dist_unit))
-        if isinstance(width, (int, float)):
-            traci.vehicletype.setWidth(vehicle_type_id, convert_units(width, "metres", self._s_dist_unit))
-        if isinstance(height, (int, float)):
-            traci.vehicletype.setHeight(vehicle_type_id, convert_units(height, "metres", self._s_dist_unit))
-        if isinstance(mass, (int, float)):
-            traci.vehicletype.setMass(vehicle_type_id, mass)
-        if isinstance(speed_factor, (int, float)):
-            traci.vehicletype.setSpeedFactor(vehicle_type_id, speed_factor)
-        if isinstance(speed_dev, (int, float)):
-            traci.vehicletype.setSpeedDeviation(vehicle_type_id, speed_dev)
-        if isinstance(min_gap, (int, float)):
-            traci.vehicletype.setMinGap(vehicle_type_id, min_gap)
-        if isinstance(acceleration, (int, float)):
-            traci.vehicletype.setAccel(vehicle_type_id, acceleration)
-        if isinstance(deceleration, (int, float)):
-            traci.vehicletype.setDecel(vehicle_type_id, deceleration)
-        if isinstance(tau, (int, float)):
-            traci.vehicletype.setTau(vehicle_type_id, tau)
-        if isinstance(max_lateral_speed, (int, float)):
-            traci.vehicletype.setMaxSpeedLat(vehicle_type_id, max_lateral_speed)
-
         self._added_vehicle_types.add(vehicle_type_id)
 
-    def add_tracked_junctions(self, junctions: str|list|tuple|dict|None = None) -> None:
+        if self._gui: gui_shape = vehicle_class
+
+        self.set_vehicle_type_vals(vehicle_type_id, vehicle_class=vehicle_class, colour=colour,
+                                   length=length, width=width, height=height, max_speed=max_speed,
+                                   speed_factor=speed_factor, speed_dev=speed_dev, min_gap=min_gap,
+                                   acceleration=acceleration, deceleration=deceleration, tau=tau,
+                                   max_lateral_speed=max_lateral_speed, emission_class=emission_class,
+                                   gui_shape=gui_shape)
+
+    def add_tracked_junctions(self, junctions: str|list|tuple|dict|None = None) -> dict:
         """
         Initalise junctions and start tracking states and flows. Defaults to all junctions with traffic lights.
         
         Args:
             `junctions` (str, list, tuple, dict, optional):Junction IDs or list of IDs, or dict containing junction(s) parameters
+        
+        Returns:
+            dict|TrackedJunction: Dictionary of added junctions or single TrackedJunction  object
         """
 
         self.track_juncs = True
+        added_junctions = {}
 
         # If none given, track all junctions with traffic lights
         if junctions == None: 
@@ -664,9 +636,13 @@ class Simulation:
                 junc_param = junc_params[junc_id] if junc_params != None else None
                 self.tracked_junctions[junc_id] = TrackedJunction(junc_id, self, junc_param)
                 self.tracked_junctions[junc_id].update_vals = True
+                added_junctions[junc_id] = self.tracked_junctions[junc_id]
             else:
                 desc = "Junction with ID '{0}' already exists.".format(junc_id)
                 raise_error(ValueError, desc, self.curr_step)
+
+        if len(added_junctions) == 1: return added_junctions[list(added_junctions.keys())[0]]
+        else: return added_junctions
 
     def reset_data(self, reset_juncs: bool = True, reset_edges: bool = True, reset_controllers: bool = True, reset_trips: bool = True) -> None:
         """
@@ -1841,7 +1817,7 @@ class Simulation:
                 raise_error(KeyError, desc, self.curr_step)
             else:
                 if junction_id in self.tracked_junctions.keys():
-                    m_len = self.tracked_junctions[junction_id].m_len
+                    m_len = self.tracked_junctions[junction_id]._m_len
                 else:
                     state_str = traci.trafficlight.getRedYellowGreenState(junction_id)
                     m_len = len(state_str)
@@ -1936,7 +1912,7 @@ class Simulation:
             raise_error(KeyError, desc, self.curr_step)
         else:
             if junction_id in self.tracked_junctions.keys():
-                m_len = self.tracked_junctions[junction_id].m_len
+                m_len = self.tracked_junctions[junction_id]._m_len
             else:
                 state_str = traci.trafficlight.getRedYellowGreenState(junction_id)
                 m_len = len(state_str)
@@ -1980,17 +1956,17 @@ class Simulation:
             raise_error(KeyError, desc, self.curr_step)
         else:
             if rm_id in self.tracked_junctions.keys():
-                m_len = self.tracked_junctions[rm_id].m_len
+                m_len = self.tracked_junctions[rm_id]._m_len
             else:
                 state_str = traci.trafficlight.getRedYellowGreenState(rm_id)
                 m_len = len(state_str)
 
         if self.track_juncs and rm_id in self.tracked_junctions.keys():
-            if len(self.tracked_junctions[rm_id].rate_times) == 0 or self.curr_step > self.tracked_junctions[rm_id].rate_times[-1]:
-                self.tracked_junctions[rm_id].metering_rates.append(metering_rate)
-                self.tracked_junctions[rm_id].rate_times.append(self.curr_step)
+            if len(self.tracked_junctions[rm_id]._rate_times) == 0 or self.curr_step > self.tracked_junctions[rm_id]._rate_times[-1]:
+                self.tracked_junctions[rm_id]._metering_rates.append(metering_rate)
+                self.tracked_junctions[rm_id]._rate_times.append(self.curr_step)
             else:
-                self.tracked_junctions[rm_id].metering_rates[-1] = metering_rate
+                self.tracked_junctions[rm_id]._metering_rates[-1] = metering_rate
 
         # Max flow for one-car-per-green
         max_flow = (3600 / (g_time + y_time + min_red))
@@ -2543,7 +2519,7 @@ class Simulation:
     
     def set_vehicle_vals(self, vehicle_ids: list|tuple|str, **kwargs) -> None:
         """
-        Calls the TraCI API to change a vehicle's state.
+        Changes vehicle characteristics.
         
         Args:
             `type` (str): Vehicle type ID
@@ -2691,6 +2667,279 @@ class Simulation:
                         else:
                             desc = "({0}): Invalid speed_safety_checks value '{1}' (must be (str), not '{2}').".format(command, value, type(value).__name__)
                             raise_error(TypeError, desc, self.curr_step)
+
+    def set_vehicle_type_vals(self, vehicle_types: list|tuple|str, **kwargs) -> None:
+        """
+        Changes vehicle type characteristics.
+        
+        Args:
+            `vehicle_class` (str): Vehicle class ID
+            `colour` (str, list, tuple): Vehicle colour, either hex code, list of rgb/rgba values or valid SUMO colour string
+            `length` (int, float): Vehicle length in metres/feet
+            `width` (int, float): Vehicle width in metres/feet
+            `height` (int, float): Vehicle height in metres/feet
+            `max_speed` (int, float): Vehicle max speed in km/h or mph
+            `speed_factor` (int, float): Vehicle speed multiplier
+            `speed_dev` (int, float): Vehicle deviation from speed factor
+            `min_gap` (int, float): Minimum gap behind leader
+            `acceleration` (int, float): Maximum vehicle acceleration
+            `deceleration` (int, float): Maximum vehicle deceleration
+            `tau` (int, float): Vehicle car following parameter
+            `max_lateral_speed` (int, float): Maximum lateral speed when lane changing
+            `emission_class` (str): Vehicle emissions class ID
+            `gui_shape` (str): Vehicle shape in GUI
+        """
+
+        if isinstance(vehicle_types, str): vehicle_types = [vehicle_types]
+        vehicle_types = validate_list_types(vehicle_types, str, param_name="vehicle_types", curr_sim_step=self.curr_step)
+
+        for vehicle_type in vehicle_types:
+            if not self.vehicle_type_exists(vehicle_type):
+                desc = f"Unrecognised vehicle type ID given ('{vehicle_type}')."
+                raise_error(KeyError, desc, self.curr_step)
+            
+            for command, value in kwargs.items():
+
+                error, desc = test_valid_string(command, valid_vehicle_type_val_keys, "command")
+                if error != None: raise_error(error, desc, self.curr_step)
+
+                if value == None: continue
+
+                match command:
+                    case "vehicle_class":
+                        if isinstance(value, str):
+                            traci.vehicletype.setVehicleClass(vehicle_type, value)
+                        else:
+                            desc = f"({command}): Invalid vehicle_class value '{value}' (must be str, not '{type(value).__name__}')."
+                            raise_error(TypeError, desc, self.curr_step)
+                        
+                    case "colour":
+                        traci.vehicletype.setColor(vehicle_type, colour_to_rgba(value, self.curr_step, f"({command}): "))
+
+                    case "length":
+                        if isinstance(value, (int, float)):
+                            if value <= 0.1:
+                                desc = f"({command}): Invalid length value '{value}' (must be > 0.1)."
+                                raise_error(ValueError, desc, self.curr_step)
+                            traci.vehicletype.setLength(vehicle_type, convert_units(value, self._s_dist_unit, "metres"))
+                        else:
+                            desc = f"({command}): Invalid length value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            raise_error(TypeError, desc, self.curr_step)
+
+                    case "width":
+                        if isinstance(value, (int, float)):
+                            if value <= 0.1:
+                                desc = f"({command}): Invalid width value '{value}' (must be > 0.1)."
+                                raise_error(ValueError, desc, self.curr_step)
+                            traci.vehicletype.setWidth(vehicle_type, convert_units(value, self._s_dist_unit, "metres"))
+                        else:
+                            desc = f"({command}): Invalid width value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            raise_error(TypeError, desc, self.curr_step)
+
+                    case "height":
+                        if isinstance(value, (int, float)):
+                            if value <= 0.1:
+                                desc = f"({command}): Invalid height value '{value}' (must be > 0.1)."
+                                raise_error(ValueError, desc, self.curr_step)
+                            traci.vehicletype.setHeight(vehicle_type, convert_units(value, self._s_dist_unit, "metres"))
+                        else:
+                            desc = f"({command}): Invalid height value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            raise_error(TypeError, desc, self.curr_step)
+
+                    case "mass":
+                        if isinstance(value, (int, float)):
+                            if value <= 0.1:
+                                desc = f"({command}): Invalid mass value '{value}' (must be > 0.1)."
+                                raise_error(ValueError, desc, self.curr_step)
+                            traci.vehicletype.setMass(vehicle_type, convert_units(value, self._weight_unit, "kilograms"))
+                        else:
+                            desc = f"({command}): Invalid mass value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            raise_error(TypeError, desc, self.curr_step)
+
+                    case "max_speed":
+                        if isinstance(value, (int, float)):
+                            if value <= 0.1:
+                                desc = f"({command}): Invalid max_speed value '{value}' (must be > 0.1)."
+                                raise_error(ValueError, desc, self.curr_step)
+                            traci.vehicletype.setMaxSpeed(vehicle_type, convert_units(value, self._speed_unit, "m/s"))
+                        else:
+                            desc = f"({command}): Invalid max_speed value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            raise_error(TypeError, desc, self.curr_step)
+
+                    case "speed_factor":
+                        if isinstance(value, (int, float)):
+                            if value <= 0:
+                                desc = f"({command}): Invalid speed_factor value '{value}' (must be > 0)."
+                                raise_error(ValueError, desc, self.curr_step)
+                            traci.vehicletype.setSpeedFactor(vehicle_type, value)
+                        else:
+                            desc = f"({command}): Invalid speed_factor value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            raise_error(TypeError, desc, self.curr_step)
+
+                    case "speed_dev":
+                        if isinstance(value, (int, float)):
+                            if value < 0:
+                                desc = f"({command}): Invalid speed_dev value '{value}' (must be >= 0)."
+                                raise_error(ValueError, desc, self.curr_step)
+                            traci.vehicletype.setSpeedDeviation(vehicle_type, value)
+                        else:
+                            desc = f"({command}): Invalid speed_dev value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            raise_error(TypeError, desc, self.curr_step)
+
+                    case "acceleration":
+                        if isinstance(value, (int, float)):
+                            if value < 0:
+                                desc = f"({command}): Invalid acceleration value '{value}' (must be >= 0)."
+                                raise_error(ValueError, desc, self.curr_step)
+                            traci.vehicletype.setAccel(vehicle_type, value)
+                        else:
+                            desc = f"({command}): Invalid acceleration value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            raise_error(TypeError, desc, self.curr_step)
+
+                    case "deceleration":
+                        if isinstance(value, (int, float)):
+                            if value < 0:
+                                desc = f"({command}): Invalid deceleration value '{value}' (must be >= 0)."
+                                raise_error(ValueError, desc, self.curr_step)
+                            traci.vehicletype.setDecel(vehicle_type, value)
+                        else:
+                            desc = f"({command}): Invalid deceleration value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            raise_error(TypeError, desc, self.curr_step)
+
+                    case "tau":
+                        if isinstance(value, (int, float)):
+                            if value < 0:
+                                desc = f"({command}): Invalid tau value '{value}' (must be >= 0)."
+                                raise_error(ValueError, desc, self.curr_step)
+                            traci.vehicletype.setTau(vehicle_type, value)
+                        else:
+                            desc = f"({command}): Invalid tau value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            raise_error(TypeError, desc, self.curr_step)
+
+                    case "max_lateral_speed":
+                        if isinstance(value, (int, float)):
+                            if value < 0:
+                                desc = f"({command}): Invalid max_lateral_speed value '{value}' (must be >= 0)."
+                                raise_error(ValueError, desc, self.curr_step)
+                            traci.vehicletype.setTau(vehicle_type, value)
+                        else:
+                            desc = f"({command}): Invalid max_lateral_speed value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            raise_error(TypeError, desc, self.curr_step)
+
+                    case "emission_class":
+                        if isinstance(value, str):
+                            traci.vehicletype.setEmissionClass(vehicle_type, value)
+                        else:
+                            desc = f"({command}): Invalid emission_class value '{value}' (must be 'str', not '{type(value).__name__}')."
+                            raise_error(TypeError, desc, self.curr_step)
+                    
+                    case "gui_shape":
+                        if isinstance(value, str):
+                            traci.vehicletype.setShapeClass(vehicle_type, value)
+                        else:
+                            desc = f"({command}): Invalid gui_shape value '{value}' (must be 'str', not '{type(value).__name__}')."
+                            raise_error(TypeError, desc, self.curr_step)
+
+    def get_vehicle_type_vals(self, vehicle_types: str|list|tuple, data_keys: str|list) -> dict|str|float|tuple:
+        """
+        Get data values for specific vehicle type(s) using a list of data keys. Valid data keys are;
+        '_vehicle_class_', '_colour_', '_length_', '_width_', '_height_', '_mass_', '_max_speed_', '_speed_factor_', '_speed_dev_',
+        '_min_gap_', '_acceleration_', '_deceleration_', '_tau_', '_max_lateral_speed_', '_emission_class_', '_gui_shape_'
+        
+        Args:
+            `vehicle_types` (str, list, tuple): Vehicle type ID or list of IDs
+            `data_keys` (str, list): Data key or list of keys
+        
+        Returns:
+            (dict, str, float, tuple): Values by `data_key` (or single value)
+        """
+                
+        all_data_vals = {}
+        if isinstance(vehicle_types, str): vehicle_types = [vehicle_types]
+        vehicle_types = validate_list_types(vehicle_types, str, param_name="vehicle_types", curr_sim_step=self.curr_step)
+
+        for vehicle_type in vehicle_types:
+            if not self.vehicle_type_exists(vehicle_type):
+                desc = f"Unrecognised vehicle type ID given ('{vehicle_type}')."
+                raise_error(KeyError, desc, self.curr_step)
+
+            return_val = False
+            if isinstance(data_keys, str):
+                data_keys = [data_keys]
+                return_val = True
+            elif isinstance(data_keys, (list, tuple)):
+                return_val = len(data_keys) == 1
+            else:
+                desc = "Invalid data_keys given '{0}' (must be [str|(str)], not '{1}').".format(data_keys, type(data_keys).__name__)
+                raise_error(TypeError, desc, self.curr_step)
+            
+            data_vals = {}
+
+            for data_key in data_keys:
+
+                error, desc = test_valid_string(data_key, valid_vehicle_type_val_keys, "data key")
+                if error != None: raise_error(error, desc, self.curr_step)
+
+                match data_key:
+
+                    case "vehicle_class":
+                        data_vals[data_key] = traci.vehicletype.getVehicleClass(vehicle_type)
+
+                    case "colour":
+                        data_vals[data_key] = tuple(traci.vehicletype.getColor(vehicle_type))
+
+                    case "length":
+                        length = convert_units(traci.vehicletype.getLength(vehicle_type), "metres", self._s_dist_unit)
+                        data_vals[data_key] = length
+
+                    case "width":
+                        width = convert_units(traci.vehicletype.getWidth(vehicle_type), "metres", self._s_dist_unit)
+                        data_vals[data_key] = width
+
+                    case "height":
+                        height = convert_units(traci.vehicletype.getHeight(vehicle_type), "metres", self._s_dist_unit)
+                        data_vals[data_key] = height
+
+                    case "mass":
+                        mass = convert_units(traci.vehicletype.getMass(vehicle_type), "kilograms", self._weight_unit)
+                        data_vals[data_key] = mass
+
+                    case "max_speed":
+                        max_speed = convert_units(traci.vehicletype.getMaxSpeed(vehicle_type), "m/s", self._speed_unit)
+                        data_vals[data_key] = max_speed
+
+                    case "speed_factor":
+                        data_vals[data_key] = traci.vehicletype.getSpeedFactor(vehicle_type)
+
+                    case "speed_dev":
+                        data_vals[data_key] = traci.vehicletype.getSpeedDeviation(vehicle_type)
+
+                    case "acceleration":
+                        data_vals[data_key] = traci.vehicletype.getAccel(vehicle_type)
+
+                    case "deceleration":
+                        data_vals[data_key] = traci.vehicletype.getDecel(vehicle_type)
+
+                    case "tau":
+                        data_vals[data_key] = traci.vehicletype.getTau(vehicle_type)
+
+                    case "max_lateral_speed":
+                        data_vals[data_key] = traci.vehicletype.getMaxSpeedLat(vehicle_type)
+
+                    case "emission_class":
+                        data_vals[data_key] = traci.vehicletype.getEmissionClass(vehicle_type)
+                    
+                    case "gui_shape":
+                        data_vals[data_key] = traci.vehicletype.getShapeClass(vehicle_type)
+
+            if len(vehicle_types) == 1:
+                if return_val: return list(data_vals.values())[0]
+                else: return data_vals
+            else:
+                if return_val: all_data_vals[vehicle_type] = list(data_vals.values())[0]
+                else: all_data_vals[vehicle_type] = data_vals
+
+        return all_data_vals
 
     def get_vehicle_ids(self, vehicle_types: str|list|tuple|None = None) -> list:
         """
@@ -4106,20 +4355,19 @@ class TrackedJunction:
         self.init_time = self.sim.curr_step
         self.curr_time = self.sim.curr_step
 
-        self.track_flow = False
-        self.measure_queues = False
-        self.is_meter = False
-        self.has_tl = junc_id in self.sim._all_tls
+        self._track_flow = False
+        self._measure_queues = False
+        self._is_meter = False
+        self._has_tl = junc_id in self.sim._all_tls
 
         self._init_params = junc_params
 
-        if self.has_tl:
+        if self._has_tl:
             state_str = traci.trafficlight.getRedYellowGreenState(junc_id)
-            self.m_len = len(state_str)
-            self.states, self.curr_state = [], []        
-            self.durations = [[] for _ in range(self.m_len)]
-            self.avg_green, self.avg_m_red = 0, 0
-            self.avg_m_green, self.avg_m_red = [0 for _ in range(self.m_len)], [0 for _ in range(self.m_len)]
+            self._m_len = len(state_str)    
+            self._durations = [[] for _ in range(self._m_len)]
+            self._avg_green, self._avg_m_red = 0, 0
+            self._avg_m_green, self._avg_m_red = [0 for _ in range(self._m_len)], [0 for _ in range(self._m_len)]
 
         if junc_params != None:
             junc_params = load_params(junc_params, "junc_params", step=self.curr_time)
@@ -4137,17 +4385,17 @@ class TrackedJunction:
 
                 if "inflow_detectors" in flow_params.keys() or "outflow_detectors" in flow_params.keys():
                     if not ("inflow_detectors" in flow_params.keys() and "outflow_detectors" in flow_params.keys()):
-                        desc = "Both 'inflow_detectors' and 'outflow_detectors' are required parameters to track flow (Junction ID: '{0}').".format(self.id)
+                        desc = f"Both 'inflow_detectors' and 'outflow_detectors' are required parameters to track flow (Junction ID: '{self.id}')."
                         raise_error(KeyError, desc, self.sim.curr_step)
                     else:
 
                         for detector_id in flow_params["inflow_detectors"]:
                             if detector_id not in self.sim.available_detectors.keys():
-                                desc = "Unrecognised detector ID '{0}' given in inflow_detectors (Junction ID: '{1}').".format(detector_id, self.id)
+                                desc = f"Unrecognised detector ID '{detector_id}' given in inflow_detectors (Junction ID: '{self.id}')."
                                 raise_error(KeyError, desc, self.sim.curr_step)
                         for detector_id in flow_params["outflow_detectors"]:
                             if detector_id not in self.sim.available_detectors.keys():
-                                desc = "Unrecognised detector ID '{0}' given in outflow_detectors (Junction ID: '{1}').".format(detector_id, self.id)
+                                desc = f"Unrecognised detector ID '{detector_id}' given in outflow_detectors (Junction ID: '{self.id}')."
                                 raise_error(KeyError, desc, self.sim.curr_step)
 
                         self.inflow_detectors = flow_params["inflow_detectors"]
@@ -4156,10 +4404,10 @@ class TrackedJunction:
                     if "vehicle_types" in flow_params.keys(): self.flow_vtypes = ["all"] + flow_params["vehicle_types"]
                     else: self.flow_vtypes = ["all"]
                     
-                    self.v_in, self.v_out = {vehicle_type: [] for vehicle_type in self.flow_vtypes}, {vehicle_type: [] for vehicle_type in self.flow_vtypes}
-                    self.inflows, self.outflows = {vehicle_type: [] for vehicle_type in self.flow_vtypes}, {vehicle_type: [] for vehicle_type in self.flow_vtypes}
+                    self._v_in, self._v_out = {vehicle_type: [] for vehicle_type in self.flow_vtypes}, {vehicle_type: [] for vehicle_type in self.flow_vtypes}
+                    self._inflows, self._outflows = {vehicle_type: [] for vehicle_type in self.flow_vtypes}, {vehicle_type: [] for vehicle_type in self.flow_vtypes}
 
-                    self.track_flow = True
+                    self._track_flow = True
 
             if "meter_params" in junc_params.keys():
                 meter_params = junc_params["meter_params"]
@@ -4169,40 +4417,43 @@ class TrackedJunction:
                 error, desc = test_input_dict(meter_params, valid_params, "'{0}' meter".format(self.id), required=["min_rate", "max_rate"])
                 if error != None: raise_error(error, desc, self.sim.curr_step)
 
-                self.is_meter = True
+                self._is_meter = True
                 self.min_rate, self.max_rate = meter_params["min_rate"], meter_params["max_rate"]
 
-                self.metering_rates = []
-                self.rate_times = []
+                self._metering_rates = []
+                self._rate_times = []
 
                 self.queue_detector = None
                 self.ramp_edges = None
                 self.max_queue = None
 
-                self.queue_lengths, self.queue_delays = [], None
+                self._queue_lengths, self._queue_delays = [], None
 
                 if "ramp_edges" in meter_params.keys():
-                    self.ramp_edges = meter_params["ramp_edges"]
+                    ramp_edges = meter_params["ramp_edges"]
                     self._ramp_length = 0
+                    if not isinstance(ramp_edges, (list, tuple)): ramp_edges = [ramp_edges]
+                    validate_list_types(ramp_edges, str, "ramp_edges", self.sim.curr_step)
+                    self.ramp_edges = ramp_edges
                     for edge in self.ramp_edges:
                         if edge not in self.sim._all_edges:
                             desc = "Edge ID '{0}' not found.".format(edge)
                             raise_error(KeyError, desc, self.sim.curr_step)
                         else: self._ramp_length += self.sim.get_geometry_vals(edge, "length")
 
-                    self.measure_queues, self.queue_detector = True, None
+                    self._measure_queues, self.queue_detector = True, None
 
-                    self.queue_delays = []
+                    self._queue_delays = []
 
-                if not self.measure_queues:
+                if not self._measure_queues:
                     if "queue_detector" in meter_params.keys():
-                        self.measure_queues, self.queue_detector = True, meter_params["queue_detector"]
+                        self._measure_queues, self.queue_detector = True, meter_params["queue_detector"]
 
                         if self.queue_detector not in self.sim.available_detectors.keys():
-                            desc = "Unrecognised detector ID given as queue_detector ('{0}').".format(self.queue_detector)
+                            desc = f"Unrecognised detector ID given as queue_detector ('{self.queue_detector}')."
                             raise_error(KeyError, desc, self.sim.curr_step)
                         elif self.sim.available_detectors[self.queue_detector]["type"] != "multientryexit":
-                            desc = "Only 'multientryexit' detectors can be used to find queue length (not '{0}').".format(self.sim.available_detectors[self.queue_detector]["type"])
+                            desc = f"Only 'multientryexit' detectors can be used to find queue length (not '{self.sim.available_detectors[self.queue_detector]["type"]}')."
                             raise_error(ValueError, desc, self.sim.curr_step)
 
                 if "init_rate" in meter_params.keys(): self.sim.set_tl_metering_rate(self.id, meter_params["init_rate"])
@@ -4210,9 +4461,9 @@ class TrackedJunction:
 
                 if "max_queue" in meter_params.keys(): self.max_queue = meter_params["max_queue"]
 
-            else: self.is_meter = False
+            else: self._is_meter = False
     
-    def __str__(self): return "<{0}: '{1}'>".format(self.__name__, self.id)
+    def __str__(self): return f"<{self.__name__()}: '{self.id}'>"
     def __name__(self): return "TrackedJunction"
 
     def __dict__(self) -> dict:
@@ -4220,19 +4471,19 @@ class TrackedJunction:
         junc_dict = {"position": self.position, "incoming_edges": self.incoming_edges, "outgoing_edges": self.outgoing_edges,
                      "init_time": self.init_time, "curr_time": self.curr_time}
         
-        if self.has_tl: junc_dict["tl"] = {"m_len": self.m_len, "avg_green": self.avg_green, "avg_red": self.avg_red,
-                                           "avg_m_green": self.avg_m_green, "avg_m_red": self.avg_m_red, "m_phases": self.durations}
+        if self._has_tl: junc_dict["tl"] = {"m_len": self._m_len, "avg_green": self._avg_green, "avg_red": self._avg_red,
+                                           "avg_m_green": self._avg_m_green, "avg_m_red": self._avg_m_red, "m_phases": self._durations}
 
-        if self.track_flow:
+        if self._track_flow:
             junc_dict["flows"] = {"inflow_detectors": self.inflow_detectors, "outflow_detectors": self.outflow_detectors,
-                                 "all_inflows": self.inflows, "all_outflows": self.outflows}
+                                 "all_inflows": self._inflows, "all_outflows": self._outflows}
             
-        if self.is_meter:
-            junc_dict["meter"] = {"metering_rates": self.metering_rates, "rate_times": self.rate_times}
+        if self._is_meter:
+            junc_dict["meter"] = {"metering_rates": self._metering_rates, "rate_times": self._rate_times}
             
-            if self.measure_queues:
-                junc_dict["meter"]["queue_lengths"] = self.queue_lengths
-                if self.ramp_edges != None: junc_dict["meter"]["queue_delays"] = self.queue_delays
+            if self._measure_queues:
+                junc_dict["meter"]["queue_lengths"] = self._queue_lengths
+                if self.ramp_edges != None: junc_dict["meter"]["queue_delays"] = self._queue_delays
 
             if self.max_queue != None: junc_dict["meter"]["max_queue"] = self.max_queue
 
@@ -4247,23 +4498,22 @@ class TrackedJunction:
         self.init_time = self.sim.curr_step
         self.curr_time = self.sim.curr_step
 
-        if self.has_tl:
-            self.states = []
-            self.durations = [[] for _ in range(self.m_len)]
-            self.avg_green, self.avg_m_red = 0, 0
-            self.avg_m_green, self.avg_m_red = [0 for _ in range(self.m_len)], [0 for _ in range(self.m_len)]
+        if self._has_tl:
+            self._durations = [[] for _ in range(self._m_len)]
+            self._avg_green, self._avg_red = 0, 0
+            self._avg_m_green, self._avg_m_red = [0 for _ in range(self._m_len)], [0 for _ in range(self._m_len)]
 
-        if self.track_flow:
-            self.v_in, self.v_out = {vehicle_type: [] for vehicle_type in self.flow_vtypes}, {vehicle_type: [] for vehicle_type in self.flow_vtypes}
-            self.inflows, self.outflows = {vehicle_type: [] for vehicle_type in self.flow_vtypes}, {vehicle_type: [] for vehicle_type in self.flow_vtypes}
+        if self._track_flow:
+            self._v_in, self._v_out = {vehicle_type: [] for vehicle_type in self.flow_vtypes}, {vehicle_type: [] for vehicle_type in self.flow_vtypes}
+            self._inflows, self._outflows = {vehicle_type: [] for vehicle_type in self.flow_vtypes}, {vehicle_type: [] for vehicle_type in self.flow_vtypes}
 
-        if self.is_meter:
-            self.metering_rates = []
-            self.rate_times = []
+        if self._is_meter:
+            self._metering_rates = []
+            self._rate_times = []
 
-            if self.measure_queues:
-                self.queue_lengths = []
-                if self.ramp_edges != None: self.queue_delays = []
+            if self._measure_queues:
+                self._queue_lengths = []
+                if self.ramp_edges != None: self._queue_delays = []
 
     def update(self, keep_data: bool = True) -> None:
         """
@@ -4276,45 +4526,42 @@ class TrackedJunction:
         self.curr_time = self.sim.curr_step
         
         if keep_data:
-            if self.has_tl:
+            if self._has_tl:
                 curr_state = traci.trafficlight.getRedYellowGreenState(self.id)
                 colours = [*curr_state]
                 for idx, mc in enumerate(colours):
                     
                     # Phase duration in steps (not seconds)
-                    if len(self.durations[idx]) == 0 or mc.upper() != self.durations[idx][-1][0]:
-                        self.durations[idx].append([mc.upper(), 1])
-                    elif mc.upper() == self.durations[idx][-1][0]:
-                        self.durations[idx][-1][1] = self.durations[idx][-1][1] + 1
+                    if len(self._durations[idx]) == 0 or mc.upper() != self._durations[idx][-1][0]:
+                        self._durations[idx].append([mc.upper(), 1])
+                    elif mc.upper() == self._durations[idx][-1][0]:
+                        self._durations[idx][-1][1] = self._durations[idx][-1][1] + 1
 
                     if mc.upper() == 'G':
-                        m_green_durs = [val[1] for val in self.durations[idx] if val[0] == 'G']
-                        self.avg_m_green[idx] = sum(m_green_durs) / len(m_green_durs)
+                        m_green_durs = [val[1] for val in self._durations[idx] if val[0] == 'G']
+                        self._avg_m_green[idx] = sum(m_green_durs) / len(m_green_durs)
                     elif mc.upper() == 'R':
-                        m_red_durs = [val[1] for val in self.durations[idx] if val[0] == 'R']
-                        self.avg_m_red[idx] = sum(m_red_durs) / len(m_red_durs)
+                        m_red_durs = [val[1] for val in self._durations[idx] if val[0] == 'R']
+                        self._avg_m_red[idx] = sum(m_red_durs) / len(m_red_durs)
 
-                self.avg_green = sum(self.avg_m_green) / len(self.avg_m_green)
-                self.avg_red = sum(self.avg_m_red) / len(self.avg_m_red)
+                self._avg_green = sum(self._avg_m_green) / len(self._avg_m_green)
+                self._avg_red = sum(self._avg_m_red) / len(self._avg_m_red)
 
-                self.states.append(colours)
-                self.curr_state = colours
-
-            if self.track_flow:
+            if self._track_flow:
                 
                 for vehicle_type in self.flow_vtypes:
                     new_v_in = self.sim.get_last_step_detector_vehicles(self.inflow_detectors, vehicle_types=[vehicle_type] if vehicle_type != "all" else None, flatten=True)
-                    new_v_in = list(set(new_v_in) - set(self.v_in[vehicle_type]))
-                    self.v_in[vehicle_type] += new_v_in
-                    self.inflows[vehicle_type].append(len(new_v_in))
+                    new_v_in = list(set(new_v_in) - set(self._v_in[vehicle_type]))
+                    self._v_in[vehicle_type] += new_v_in
+                    self._inflows[vehicle_type].append(len(new_v_in))
 
                 for vehicle_type in self.flow_vtypes:
                     new_v_out = self.sim.get_last_step_detector_vehicles(self.outflow_detectors, vehicle_types=[vehicle_type] if vehicle_type != "all" else None, flatten=True)
-                    new_v_out = list(set(new_v_out) - set(self.v_out[vehicle_type]))
-                    self.v_out[vehicle_type] += new_v_out
-                    self.outflows[vehicle_type].append(len(new_v_out))
+                    new_v_out = list(set(new_v_out) - set(self._v_out[vehicle_type]))
+                    self._v_out[vehicle_type] += new_v_out
+                    self._outflows[vehicle_type].append(len(new_v_out))
 
-            if self.measure_queues:
+            if self._measure_queues:
 
                 if self.ramp_edges != None:
                     queuing_vehicles = self.sim.get_last_step_geometry_vehicles(self.ramp_edges, flatten=True)
@@ -4329,30 +4576,51 @@ class TrackedJunction:
                         allowed_speeds = [vehicle_data["allowed_speed"]]
                     else: speeds, allowed_speeds = [], []
 
-                    self.queue_lengths.append(len([veh_id for veh_id in queuing_vehicles if self.sim.get_vehicle_vals(veh_id, "is_stopped")]))
+                    self._queue_lengths.append(len([veh_id for veh_id in queuing_vehicles if self.sim.get_vehicle_vals(veh_id, "is_stopped")]))
 
                     if len(queuing_vehicles) > 0:
                         avg_speed = sum(speeds) / len(speeds)
                         ff_speed = sum(allowed_speeds) / len(allowed_speeds)
 
-                        if avg_speed == 0: self.queue_delays.append(len(speeds))
-                        elif avg_speed >= ff_speed: self.queue_delays.append(0)
+                        if avg_speed == 0: self._queue_delays.append(len(speeds))
+                        elif avg_speed >= ff_speed: self._queue_delays.append(0)
                         else:
                             ramp_length = convert_units(self._ramp_length, self.sim._l_dist_unit, "metres")
                             flow = (avg_speed * (len(queuing_vehicles) / ramp_length)) * self.sim.step_length
-                            self.queue_delays.append(flow * ((ramp_length / avg_speed) - (ramp_length / ff_speed)))
+                            self._queue_delays.append(flow * ((ramp_length / avg_speed) - (ramp_length / ff_speed)))
 
-                    else: self.queue_delays.append(0)
+                    else: self._queue_delays.append(0)
                 
                 elif self.queue_detector != None:
                     queuing_vehicles = self.sim.get_last_step_detector_vehicles(self.queue_detector, flatten=True)
                     queuing_vehicles = [veh_id for veh_id in queuing_vehicles if self.sim.vehicle_exists(veh_id)]
                     num_stopped = len([veh_id for veh_id in queuing_vehicles if self.sim.get_vehicle_vals(veh_id, "is_stopped")])
-                    self.queue_lengths.append(num_stopped)
+                    self._queue_lengths.append(num_stopped)
 
                 else:
-                    desc = "Cannot update meter '{0}' queue length (no detector or entry/exit edges)".format(self.id)
+                    desc = f"Cannot update meter '{self.id}' queue length (no detector or entry/exit edges)"
                     raise_error(KeyError, desc, self.sim.curr_step)
+
+    def set_metering_rate(self, metering_rate: int|float, g_time: int|float = 1, y_time: int|float = 1, min_red: int|float = 1, vehs_per_cycle: int|None = None, control_interval: int|float = 60):
+        """
+        Set ramp metering rate of a meter at a junction. Uses a one-car-per-green policy with a default
+        1s green and yellow time, with red phase duration changed to set flow. All phase durations must
+        be larger than the simulation step length.
+        
+        Args:
+            `metering_rate` (int, float): On-ramp inflow in veh/hr (from all lanes)
+            `g_time` (int, float): Green phase duration (s), defaults to 1
+            `y_time` (int, float): Yellow phase duration (s), defaults to 1
+            `min_red` (int, float): Minimum red phase duration (s), defaults to 1
+            `vehs_per_cycle` (int, optional):Number of vehicles released with each cycle, defaults to the number of lanes
+            `control_interval` (int, float): Ramp meter control interval (s)
+        """
+
+        if not self._is_meter:
+            desc = f"Cannot set metering rate (Junction ID '{self.id}' is not a metered junction)."
+            raise_error(SimulationError, desc, self.sim.curr_step)
+        
+        self.sim.set_tl_metering_rate(self.id, metering_rate, g_time, y_time, min_red, vehs_per_cycle, control_interval)
 
 class TrackedEdge:
     """ Edge object with automatic data collection. """
@@ -4481,7 +4749,7 @@ def print_summary(sim_data: dict|str, save_file: str|None=None, tab_width: int=5
         if sim_data.endswith(".json"): r_class, r_mode = json, "r"
         elif sim_data.endswith(".pkl"): r_class, r_mode = pkl, "rb"
         else:
-            desc = "{0}: sim_data file '{1}' is invalid (must be '.json' or '.pkl').".format(caller, sim_data)
+            desc = f"{caller}: sim_data file '{sim_data}' is invalid (must be '.json' or '.pkl')."
             raise ValueError(desc)
 
         if os.path.exists(sim_data):

@@ -49,6 +49,9 @@ valid_data_keys = { "detector": {
                         "speed_safety_checks":   {"getter": False, "setter": True, "tc": None},
                         "lc_safety_checks":      {"getter": False, "setter": True, "tc": None}
                     },
+                    "vehicle_type": ["vehicle_class", "colour", "length", "width", "height", "max_speed", "speed_factor", "speed_dev", #"mass",
+                                     "min_gap", "acceleration", "deceleration", "tau", "max_lateral_speed", "emission_class", "gui_shape"
+                    ],
                     "geometry": {
                         "vehicle_count":        {"class": "both", "setter": False, "tc": tc.LAST_STEP_VEHICLE_NUMBER},
                         "vehicle_ids":          {"class": "both", "setter": False, "tc": tc.LAST_STEP_VEHICLE_ID_LIST},
@@ -88,6 +91,8 @@ traci_constants["detector"] = {data_key: tc for data_key, tc in valid_data_keys[
 valid_set_vehicle_val_keys = [data_key for data_key, cfg in valid_data_keys["vehicle"].items() if cfg["setter"]]
 valid_get_vehicle_val_keys = [data_key for data_key, cfg in valid_data_keys["vehicle"].items() if cfg["getter"]]
 traci_constants["vehicle"] = {data_key: cfg["tc"] for data_key, cfg in valid_data_keys["vehicle"].items() if cfg["tc"] != None}
+
+valid_vehicle_type_val_keys = valid_data_keys["vehicle_type"]
 
 valid_get_edge_val_keys = [data_key for data_key, cfg in valid_data_keys["geometry"].items() if cfg["class"] != "lane"]
 valid_get_lane_val_keys = [data_key for data_key, cfg in valid_data_keys["geometry"].items() if cfg["class"] != "edge"]
@@ -264,7 +269,12 @@ def convert_units(values, orig_units, new_units, step_length=1, keep_arr=False):
                               [1/step_length, 1, 1/60, 1/3600], # s
                               [60/step_length, 60, 1, 1/60], # m
                               [3600/step_length, 3600, 60, 1]] # hr
-                  }
+                  },
+               "weight":
+                  {"units": ["kilograms", "pounds"],
+                   "matrix": [[1, 2.204623], # kg
+                              [1/2.204623, 1]] # lb
+                  },
              }
     
     o_class = [key for key, val in c_mats.items() if orig_units in val["units"]]
