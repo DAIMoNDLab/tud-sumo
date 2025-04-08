@@ -688,7 +688,8 @@ class Simulation:
 
         if traci.simulation.getMinExpectedNumber() == 0:
 
-            if False not in [dp.is_complete() for dp in self._demand_profiles.values()]: return True
+            if len(self._demand_profiles) != 0:
+                if False not in [dp.is_complete() for dp in self._demand_profiles.values()]: return True
             if close: self.end()
             if not self._suppress_warnings:
                 raise_warning("Ended simulation early (no vehicles remaining).", self.curr_step)
@@ -706,7 +707,7 @@ class Simulation:
         try:
             traci.close()
         except traci.exceptions.FatalTraCIError:
-            raise_warning("TraCI is not connected (Simulation already ended).", self.curr_step)
+            pass
         self._running = False
 
     def save_data(self, filename: str|None = None, overwrite: bool = True, json_indent: int|None = 4) -> None:
@@ -3651,7 +3652,7 @@ class Simulation:
                         vals = self.get_geometry_vals(geometry_id, ("length", speed_key))
                         length, speed = vals["length"], vals[speed_key]
                         if self.units.name == "UK": speed = convert_units(speed, "mph", "kmph")
-                        data_vals[data_key] = length / speed
+                        data_vals[data_key] = length / max(speed, 0.1)
 
                     case "ff_travel_time":
                         vals = self.get_geometry_vals(geometry_id, ("length", "max_speed"))

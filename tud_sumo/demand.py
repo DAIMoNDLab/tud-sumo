@@ -4,16 +4,20 @@ from .utils import *
 
 class DemandProfile:
 
-    def __init__(self, simulation):
+    def __init__(self, simulation=None, step_length=1):
         from .simulation import Simulation
 
-        self.sim = simulation
         self.id = None
-        while self.id == None or self.id in self.sim._demand_profiles:
-            self.id = self._generate_id()
-        self.sim._demand_profiles[self.id] = self
-
-        self.step_length = self.sim.step_length
+        self._sim = None
+    
+        if simulation != None:
+            self.add_to_simulation(simulation)
+            self.step_length = self._sim.step_length
+        elif step_length != None:
+            self.step_length = step_length
+        else:
+            desc = "No Simulation object or step length given."
+            raise_error(ValueError, desc)
 
         self._demand_headers = ["routing", "step_range", "veh/hour", "vehicle_types", "vehicle_type_dists",
                                 "init_speed", "origin_lane", "origin_pos", "insertion_sd", "colour"]
@@ -38,19 +42,42 @@ class DemandProfile:
         """ Deactivate the demand profile. """
         self.active = False
 
+    def add_to_simulation(self, simulation) -> None:
+        """
+        Adds the profile to a simulation object.
+        
+        Args:
+            `simulation` (Simulation): Simulation object to add the profile to
+        """
+
+        if self._sim != None: self.remove()
+
+        self._sim = simulation
+    
+        while self.id == None or self.id in self._sim._demand_profiles:
+            self.id = self._generate_id()
+
+        self._sim._demand_profiles[self.id] = self
+
+        if len(self._vehicle_types) > 0:
+            for vehicle_type_id, vehicle_type_data in self._vehicle_types.items():
+                self._sim.add_vehicle_type(vehicle_type_id, **vehicle_type_data)
+
     def remove(self) -> None:
         """ Removes the profile from its corresponding simulation. """
 
-        del self.sim._demand_profiles[self.id]
-        self.sim = None
+        if self._sim != None:
+            del self._sim._demand_profiles[self.id]
+            self._sim = None
 
     def is_complete(self) -> bool:
         """ Returns whether all scheduled vehicles have been added to the simulation. """
         
-        if len(self._demand_arrs) == 0: return True
+        if self._sim == None: return False
+        elif len(self._demand_arrs) == 0: return True
         else:
             end_times = [arr[1][1] for arr in self._demand_arrs]
-            return max(end_times) > self.sim.curr_step
+            return max(end_times) > self._sim.curr_step
         
     def plot_demand(self, routing: str|list|tuple|None=None, save_fig: str|None=None) -> None:
         """
@@ -61,9 +88,13 @@ class DemandProfile:
             `save_fig` (str, optional): Output image filename, will show image if not given
         """
 
+        if self._sim == None:
+            desc = "Cannot plot demand (no simulation object found)."
+            raise_error(ValueError, desc)
+
         from .plot import Plotter
 
-        plt = Plotter(self.sim, time_unit="hours")
+        plt = Plotter(self._sim, time_unit="hours")
         plt.plot_demand(routing, self, save_fig=save_fig)
         del plt
 
@@ -90,13 +121,9 @@ class DemandProfile:
             `gui_shape` (str, optional): Vehicle shape in GUI (defaults to vehicle class name)
         """
 
-        if self.sim == None:
-            desc = "No Simulation object found."
-            raise_error(KeyError, desc)
-
         vehicle_type_data = {name: locals()[name] for name in valid_vehicle_type_val_keys if locals()[name] != None}
 
-        self.sim.add_vehicle_type(vehicle_type_id, **vehicle_type_data)
+        if self._sim != None: self._sim.add_vehicle_type(vehicle_type_id, **vehicle_type_data)
         self._vehicle_types[vehicle_type_id] = vehicle_type_data
         
     def create_route_file(self, filename: str) -> None:
@@ -132,7 +159,7 @@ class DemandProfile:
 
                 if "color" in sumo_attributes:
                     if sumo_attributes["color"] not in sumo_colours:
-                        colour = colour_to_rgba(sumo_attributes["color"], self.sim.curr_step)
+                        colour = colour_to_rgba(sumo_attributes["color"])
                         if isinstance(colour, (list, tuple)): colour = ",".join([str(val) for val in colour])
                         sumo_attributes["color"] = colour
 
@@ -156,7 +183,7 @@ class DemandProfile:
                 
                 if demand_arr[9] != None: 
                     if demand_arr[9] not in sumo_colours:
-                        colour = colour_to_rgba(demand_arr[9], self.sim.curr_step)
+                        colour = colour_to_rgba(demand_arr[9])
                         if isinstance(colour, (list, tuple)): colour = ",".join([str(val) for val in colour])
                     else: colour = demand_arr[9]
                     attributes["color"] = colour
@@ -166,7 +193,8 @@ class DemandProfile:
                 
                 for vehicle_type, type_dist in zip(vehicle_types, vehicle_type_dists):
                     attributes["id"] = f"flow_{idx}"
-                    attributes["type"] = vehicle_type
+                    if vehicle_type != "DEFAULT_VEHTYPE": attributes["type"] = vehicle_type
+                    else: del attributes["type"]
                     attributes["vehsPerHour"] = str(vehs_per_hour * type_dist)
 
                     root.append(et.Element("flow", attrib=attributes))
@@ -332,53 +360,50 @@ class DemandProfile:
             `colour` (str, list, tuple, optional): Vehicle colour, either hex code, list of rgb/rgba values or valid SUMO colour string
         """
 
-        if self.sim == None:
-            desc = "No Simulation object found."
-            raise_error(KeyError, desc)
+        if self._sim != None:
+            routing = validate_type(routing, (str, list, tuple), "routing", self._sim.curr_step)
+            if isinstance(routing, str) and not self._sim.route_exists(routing):
+                desc = "Unknown route ID '{0}'.".format(routing)
+                raise_error(KeyError, desc, self._sim.curr_step)
+            elif isinstance(routing, (list, tuple)):
+                routing = validate_list_types(routing, (str, str), True, "routing", self._sim.curr_step)
+                if not self._sim.is_valid_path(routing):
+                    desc = "No route between edges '{0}' and '{1}'.".format(routing[0], routing[1])
+                    raise_error(ValueError, desc, self._sim.curr_step)
 
-        routing = validate_type(routing, (str, list, tuple), "routing", self.sim.curr_step)
-        if isinstance(routing, str) and not self.sim.route_exists(routing):
-            desc = "Unknown route ID '{0}'.".format(routing)
-            raise_error(KeyError, desc, self.sim.curr_step)
-        elif isinstance(routing, (list, tuple)):
-            routing = validate_list_types(routing, (str, str), True, "routing", self.sim.curr_step)
-            if not self.sim.is_valid_path(routing):
-                desc = "No route between edges '{0}' and '{1}'.".format(routing[0], routing[1])
-                raise_error(ValueError, desc, self.sim.curr_step)
+            step_range = validate_list_types(step_range, ((int), (int)), True, "step_range", self._sim.curr_step)
+            if step_range[1] < step_range[0] or step_range[1] < self._sim.curr_step:
+                desc = "Invalid step_range '{0}' (must be valid range and end > current step)."
+                raise_error(ValueError, desc, self._sim.curr_step)
 
-        step_range = validate_list_types(step_range, ((int), (int)), True, "step_range", self.sim.curr_step)
-        if step_range[1] < step_range[0] or step_range[1] < self.sim.curr_step:
-            desc = "Invalid step_range '{0}' (must be valid range and end > current step)."
-            raise_error(ValueError, desc, self.sim.curr_step)
+            if vehicle_types != None:
+                vehicle_types = validate_type(vehicle_types, (str, list, tuple), param_name="vehicle_types", curr_sim_step=self._sim.curr_step)
+                if isinstance(vehicle_types, (list, tuple)):
+                    vehicle_types = validate_list_types(vehicle_types, str, param_name="vehicle_types", curr_sim_step=self._sim.curr_step)
+                    for type_id in vehicle_types:
+                        if not self._sim.vehicle_type_exists(type_id):
+                            desc = "Unknown vehicle type ID '{0}' in vehicle_types.".format(type_id)
+                            raise_error(KeyError, desc, self._sim.curr_step)
+                elif not self._sim.vehicle_type_exists(vehicle_types):
+                    desc = "Unknown vehicle_types ID '{0}' given.".format(vehicle_types)
+                    raise_error(KeyError, desc, self._sim.curr_step)
+            else: vehicle_types = "DEFAULT_VEHTYPE"
+            
+            if vehicle_type_dists != None and vehicle_types == None:
+                desc = "vehicle_type_dists given, but no vehicle types."
+                raise_error(ValueError, desc, self._sim.curr_step)
+            elif vehicle_type_dists != None and isinstance(vehicle_types, str):
+                desc = "Invalid vehicle_type_dists (vehicle_types is a single type ID, so no distribution)."
+                raise_error(ValueError, desc, self._sim.curr_step)
+            elif vehicle_type_dists != None:
+                vehicle_type_dists = validate_list_types(vehicle_type_dists, float, param_name="vehicle_type_dists", curr_sim_step=self._sim.curr_step)
+                if len(vehicle_type_dists) != len(vehicle_types):
+                    desc = "Invalid vehicle_type_dists (must be same length as vehicle_types, {0} != {1}).".format(len(vehicle_type_dists), len(vehicle_types))
+                    raise_warning(ValueError, desc, self._sim.curr_step)
 
-        if vehicle_types != None:
-            vehicle_types = validate_type(vehicle_types, (str, list, tuple), param_name="vehicle_types", curr_sim_step=self.sim.curr_step)
-            if isinstance(vehicle_types, (list, tuple)):
-                vehicle_types = validate_list_types(vehicle_types, str, param_name="vehicle_types", curr_sim_step=self.sim.curr_step)
-                for type_id in vehicle_types:
-                    if not self.sim.vehicle_type_exists(type_id):
-                        desc = "Unknown vehicle type ID '{0}' in vehicle_types.".format(type_id)
-                        raise_error(KeyError, desc, self.sim.curr_step)
-            elif not self.sim.vehicle_type_exists(vehicle_types):
-                desc = "Unknown vehicle_types ID '{0}' given.".format(vehicle_types)
-                raise_error(KeyError, desc, self.sim.curr_step)
-        else: vehicle_types = "DEFAULT_VEHTYPE"
-        
-        if vehicle_type_dists != None and vehicle_types == None:
-            desc = "vehicle_type_dists given, but no vehicle types."
-            raise_error(ValueError, desc, self.sim.curr_step)
-        elif vehicle_type_dists != None and isinstance(vehicle_types, str):
-            desc = "Invalid vehicle_type_dists (vehicle_types is a single type ID, so no distribution)."
-            raise_error(ValueError, desc, self.sim.curr_step)
-        elif vehicle_type_dists != None:
-            vehicle_type_dists = validate_list_types(vehicle_type_dists, float, param_name="vehicle_type_dists", curr_sim_step=self.sim.curr_step)
-            if len(vehicle_type_dists) != len(vehicle_types):
-                desc = "Invalid vehicle_type_dists (must be same length as vehicle_types, {0} != {1}).".format(len(vehicle_type_dists), len(vehicle_types))
-                raise_warning(ValueError, desc, self.sim.curr_step)
+            insertion_sd = validate_type(insertion_sd, (int, float), "insertion_sd", self._sim.curr_step)
 
-        insertion_sd = validate_type(insertion_sd, (int, float), "insertion_sd", self.sim.curr_step)
-
-        self.sim._manual_flow = True
+            self._sim._manual_flow = True
         self._demand_arrs.append([routing, step_range, demand, vehicle_types, vehicle_type_dists, initial_speed, origin_lane, origin_pos, insertion_sd, colour])
 
     def add_demand_function(self, routing: str|list|tuple, step_range: list|tuple, demand_function, parameters: dict|None = None, vehicle_types: str|list|tuple|None = None, vehicle_type_dists: list|tuple|None = None, initial_speed: str|int|float = "max", origin_lane: str|int|float = "best", origin_pos: str|int = "base", insertion_sd: float = 0.333, colour: str|list|tuple|None = None) -> None:
@@ -399,10 +424,10 @@ class DemandProfile:
             `colour` (str, list, tuple, optional): Vehicle colour, either hex code, list of rgb/rgba values or valid SUMO colour string
         """
         
-        step_range = validate_list_types(step_range, ((int), (int)), True, "step_range", self.sim.curr_step)
-        if step_range[1] < step_range[0] or step_range[1] < self.sim.curr_step:
+        step_range = validate_list_types(step_range, ((int), (int)), True, "step_range")
+        if step_range[1] < step_range[0] or (self._sim != None and step_range[1] < self._sim.curr_step):
             desc = "Invalid step_range '{0}' (must be valid range and end > current step)."
-            raise_error(ValueError, desc, self.sim.curr_step)
+            raise_error(ValueError, desc)
         
         # Step through start -> end, calculate flow value 
         for step_no in range(step_range[0], step_range[1]):
@@ -414,7 +439,7 @@ class DemandProfile:
             # Outputs must be a number
             if not isinstance(demand_val, (int, float)):
                 desc = "Invalid demand function (output must be type 'int', not '{0}').".format(type(demand_val).__name__)
-                raise_error(TypeError, desc, self.sim.curr_step)
+                raise_error(TypeError, desc)
             
             # Skip if equal to or less than 0
             if demand_val <= 0: continue
@@ -474,8 +499,8 @@ class DemandProfile:
         if not filename.endswith('.pkl'): filename += ".pkl"
 
         if os.path.exists(filename):
-            if overwrite and self.sim != None and not self.sim._suppress_warnings:
-                raise_warning(f"File '{filename}' already exists and will be overwritten.", self.sim.curr_step)
+            if overwrite and self._sim != None and not self._sim._suppress_warnings:
+                raise_warning(f"File '{filename}' already exists and will be overwritten.", self._sim.curr_step)
             elif not overwrite:
                 desc = f"File '{filename}' already exists and cannot be overwritten."
                 raise_error(FileExistsError, desc, self.curr_step)
