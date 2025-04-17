@@ -4454,7 +4454,7 @@ class TrackedJunction:
                             desc = f"Unrecognised detector ID given as queue_detector ('{self.queue_detector}')."
                             raise_error(KeyError, desc, self.sim.curr_step)
                         elif self.sim.available_detectors[self.queue_detector]["type"] != "multientryexit":
-                            desc = f"Only 'multientryexit' detectors can be used to find queue length (not '{self.sim.available_detectors[self.queue_detector]["type"]}')."
+                            desc = "Only 'multientryexit' detectors can be used to find queue length (not '{0}').".format(self.sim.available_detectors[self.queue_detector]["type"])
                             raise_error(ValueError, desc, self.sim.curr_step)
 
                 if "init_rate" in meter_params.keys(): self.sim.set_tl_metering_rate(self.id, meter_params["init_rate"])
