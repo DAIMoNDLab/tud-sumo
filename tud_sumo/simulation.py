@@ -4772,7 +4772,7 @@ def print_summary(sim_data: dict|str, save_file: str|None=None, tab_width: int=5
     tertiary_delineator = " * "+"-"*tab_width+" *"
     
     print(primary_delineator)
-    _table_print(f"TUD-SUMO v{sim_data["tuds_version"]}", tab_width)
+    _table_print("TUD-SUMO v{0}".format(sim_data["tuds_version"]), tab_width)
 
     print(primary_delineator)
     _table_print(sim_data["scenario_name"], tab_width)
