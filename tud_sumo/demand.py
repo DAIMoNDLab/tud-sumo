@@ -172,9 +172,11 @@ class DemandProfile:
             idx = 0
             for demand_arr in self._demand_arrs:
                 
+                vehs_per_hour = demand_arr[2]
+                if vehs_per_hour <= 0: continue
+
                 origin, destination = demand_arr[0]
                 start, end = demand_arr[1]
-                vehs_per_hour = demand_arr[2]
                 vehicle_types = demand_arr[3]
                 vehicle_type_dists = demand_arr[4]
 

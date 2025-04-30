@@ -815,7 +815,9 @@ class Plotter(_GenericPlotter):
                 ax1.legend(shadow=True)
                 def_y_label = "Queue Length (No. of Vehicles)"
         
-        else: ax1.set_ylim([0, get_axis_lim(queue_lengths)])
+        else:
+            ax1.set_ylim([0, get_axis_lim(queue_lengths)])
+            def_y_label = "Queue Length (No. of Vehicles)"
 
         ax1.plot(data_time_vals, queue_lengths, linewidth=1, zorder=3, color=colour)
         if xax_labels: ax1.set_xlabel(self._default_labels["sim_time"])
