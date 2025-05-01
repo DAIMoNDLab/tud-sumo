@@ -2289,7 +2289,7 @@ class MultiPlotter(_GenericPlotter):
     def __str__(self): return "<{0}>".format(self.__name__)
     def __name__(self): return "MultiPlotter"
 
-    def add_simulations(self, simulations: list|tuple, labels: list|tuple|None=None, groups: str|list|tuple|None=None, pbar: bool=True) -> None:
+    def add_simulations(self, simulations: list|tuple, labels: list|tuple|None=None, groups: str|list|tuple|None=None, delete_edge_data: bool=False, delete_trip_data: bool=False, pbar: bool=True) -> None:
         """
         Add simulation dataset(s) to the plotter. `simulations` and `labels` must have the same length, with each
         label corresponding to a simulation. By default, all simulations will use their scenario name as a labels,
@@ -2300,12 +2300,16 @@ class MultiPlotter(_GenericPlotter):
         a group ID in the list to `None` to only assign specific simulations a group.
 
         Note that large simulation data files may take some time to load. Errors may also occur when adding very
-        large numbers of simulation data files.
+        large numbers of simulation data files. To help avoid this, if not needed for plotting, use `delete_edge_data`
+        and `delete_trip_data` to delete large edge and trip datasets respectively from the simulation data. This should
+        decrease loading time and memory usage, allowing for more simulations to be added to the `MultiPlotter`
 
         Args:
             `simulations` (list, tuple): List of sim_data filepaths
             `labels` (list, tuple, optional): List of simulation dataset labels
             `groups` (str, list, tuple, optional): List of group IDs or single ID
+            `delete_edge_data` (bool): Denotes whether to delete edge data from simulation data
+            `delete_trip_data` (bool): Denotes whether to delete trip data from simulation data
             `pbar` (bool): Denotes whether to print a progress bar when loading multiple files
         """
 
@@ -2351,7 +2355,10 @@ class MultiPlotter(_GenericPlotter):
                 with open(simulation, r_mode) as fp:
                     sim_data = r_class.load(fp)
                     sim_units = sim_data["units"]
-
+                    
+                    if delete_edge_data and "edges" in sim_data["data"]: del sim_data["data"]["edges"]
+                    if delete_trip_data and "trips" in sim_data["data"]: del sim_data["data"]["trips"]
+                    
                     if sim_units != self.units:
                         desc = "Invalid Simulation '{0}', units mismatch (must be MultiPlotter unit '{1}', not '{2}').".format(sim_label, sim_units, self.units)
                         raise_error(ValueError, desc)
