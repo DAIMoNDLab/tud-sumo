@@ -2302,7 +2302,8 @@ class MultiPlotter(_GenericPlotter):
         Note that large simulation data files may take some time to load. Errors may also occur when adding very
         large numbers of simulation data files. To help avoid this, if not needed for plotting, use `delete_edge_data`
         and `delete_trip_data` to delete large edge and trip datasets respectively from the simulation data. This should
-        decrease loading time and memory usage, allowing for more simulations to be added to the `MultiPlotter`
+        decrease loading time and memory usage, allowing for more simulations to be added to the `MultiPlotter`. This
+        does not affect the saved simulation files.
 
         Args:
             `simulations` (list, tuple): List of sim_data filepaths

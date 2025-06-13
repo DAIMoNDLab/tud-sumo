@@ -2231,7 +2231,7 @@ class Simulation:
             geometry_ids = validate_list_types(geometry_ids, str, param_name="geometry_ids", curr_sim_step=self.curr_step)
 
             all_geometry_vehicles = self.get_last_step_geometry_vehicles(geometry_ids)
-            vehicle_ids = choices(all_geometry_vehicles, min(n_vehicles, len(all_geometry_vehicles)))
+            vehicle_ids = choices(all_geometry_vehicles, k=min(n_vehicles, len(all_geometry_vehicles)))
 
         # Neither location or vehicles specified - an error is thrown
         elif geometry_ids != None and vehicle_ids != None:
@@ -2241,10 +2241,10 @@ class Simulation:
         if check_n_vehicles:
             if len(vehicle_ids) != n_vehicles:
                 if assert_n_vehicles:
-                    desc = "Incident could not be started (could not find enough vehicles, {0} != {1}).".format()
+                    desc = f"Incident could not be started (could not find enough vehicles, {len(vehicle_ids)} != {n_vehicles})."
                     raise_error(SimulationError, desc, self.curr_step)
                 else:
-                    if not self._suppress_warnings: raise_warning("Incident could not be started (could not find enough vehicles, {0} != {1}).".format())
+                    if not self._suppress_warnings: raise_warning(f"Incident could not be started (could not find enough vehicles, {len(vehicle_ids)} != {n_vehicles}).")
                     return False
 
         # Either specific vehicles are given to be included in the incident, or
@@ -2523,19 +2523,19 @@ class Simulation:
         Changes vehicle characteristics.
         
         Args:
-            `type` (str): Vehicle type ID
             `vehicle_ids` (list, tuple, str): Vehicle ID or list of IDs
+            `type` (str, optional): Vehicle type ID
             `colour` (str, list, tuple, optional): Vehicle colour, either hex code, list of rgb/rgba values or valid SUMO colour string
-            `highlight` (bool): Highlights the vehicle with a circle (bool)
-            `speed` (int, float): Set new speed value
-            `max_speed` (int, float): Set new max speed value
-            `acceleration` ((int, float), (int, float)): Set acceleration for a given duration 
-            `lane_idx` (int, (int, float)): Try and change lane for a given duration
-            `destination` (str): Set vehicle destination edge ID
-            `route_id` (str): Set vehicle route by route ID or list of edges
-            `route_edges` (list): Set vehicle route by list of edges
-            `speed_safety_checks` (bool): (**Indefinitely**) set whether speed/acceleration safety constraints are followed when setting speed
-            `lc_safety_checks` (bool): (**Indefinitely**) set whether lane changing safety constraints are followed when changing lane
+            `highlight` (bool, optional): Highlights the vehicle with a circle (bool)
+            `speed` (int, float, optional): Set new speed value
+            `max_speed` (int, float, optional): Set new max speed value
+            `acceleration` ((int, float, optional), (int, float)): Set acceleration for a given duration 
+            `lane_idx` (int, (int, float), optional): Try and change lane for a given duration
+            `destination` (str, optional): Set vehicle destination edge ID
+            `route_id` (str, optional): Set vehicle route by route ID or list of edges
+            `route_edges` (list, optional): Set vehicle route by list of edges
+            `speed_safety_checks` (bool, optional): (**Indefinitely**) set whether speed/acceleration safety constraints are followed when setting speed
+            `lc_safety_checks` (bool, optional): (**Indefinitely**) set whether lane changing safety constraints are followed when changing lane
         """
 
         if isinstance(vehicle_ids, str): vehicle_ids = [vehicle_ids]
