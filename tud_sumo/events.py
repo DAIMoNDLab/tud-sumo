@@ -243,7 +243,7 @@ class Event:
                 desc = "Event 'locations' or 'vehicle_ids' are not given and one is required."
                 raise_error(KeyError, desc, self.sim.curr_step)
 
-            self.v_effect_dur = math.inf if "effect_duration" not in veh_params.keys() else veh_params["effect_duration"]
+            self.v_effect_dur = math.inf if "effect_duration" not in veh_params.keys() else veh_params["effect_duration"] / self.sim.step_length
             self.v_actions, self.v_base, self.affected_vehicles = {} if "actions" not in veh_params else veh_params["actions"], {}, {}
 
             if "vehicle_types" in veh_params.keys():

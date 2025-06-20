@@ -2151,7 +2151,7 @@ class Simulation:
         the network if neither `vehicle_ids` or `geometry_ids` are given.
         
         Args:
-            `duration` (int): Duration of incident (in simulation steps)
+            `duration` (int): Duration of incident (in seconds)
             `vehicle_ids` (str, list, tuple, optional):Vehicle ID or list of IDs to include in the incident
             `geometry_ids` (str, list, tuple, optional):Geometry ID or list of IDs to randomly select vehicles from
             `n_vehicles` (int): Number of vehicles in the incident, if randomly chosen
@@ -2173,7 +2173,7 @@ class Simulation:
             while self._scheduler.get_event_status("incident_{0}".format(id_idx)) != None: id_idx += 1
             incident_id = "incident_{0}".format(id_idx)
 
-        event_dict = {"start_time": (self.curr_step + 1) * self.step_length, "end_time": (self.curr_step + duration) * self.step_length,
+        event_dict = {"start_time": (self.curr_step + 1) * self.step_length, "end_time": (self.curr_step * self.step_length) + duration,
                       "vehicles": {"effect_duration": duration, "remove_affected_vehicles": True,
                                    "speed_safety_checks": False, "lc_safety_checks": False}}
         
