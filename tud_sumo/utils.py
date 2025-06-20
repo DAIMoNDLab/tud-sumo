@@ -47,7 +47,9 @@ valid_data_keys = { "detector": {
                         "leader_id":     {"getter": True,  "setter": False, "tc": tc.VAR_LEADER},
                         "leader_dist":   {"getter": True,  "setter": False, "tc": tc.VAR_LEADER},
                         "speed_safety_checks":   {"getter": False, "setter": True, "tc": None},
-                        "lc_safety_checks":      {"getter": False, "setter": True, "tc": None}
+                        "lc_safety_checks":      {"getter": False, "setter": True, "tc": None},
+                        "stop":          {"getter": False, "setter": True,  "tc": None},
+                        "next_edge_id":  {"getter": True,  "setter": False, "tc": None},
                     },
                     "vehicle_type": ["vehicle_class", "colour", "length", "width", "height", "max_speed", "speed_factor", "speed_dev", #"mass",
                                      "min_gap", "acceleration", "deceleration", "tau", "max_lateral_speed", "emission_class", "gui_shape"

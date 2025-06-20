@@ -234,10 +234,6 @@ class Event:
             error, desc = test_input_dict(veh_params, valid_params, "vehicle")
             if error != None: raise_error(error, desc, self.sim.curr_step)
 
-            if "actions" not in veh_params.keys():
-                desc = "Vehicle events require 'actions' parameters."
-                raise_error(KeyError, desc, self.sim.curr_step)
-
             self.locations, self.vehicle_ids = None, None
             if "locations" in veh_params:
                 self.locations = veh_params["locations"]
@@ -248,7 +244,7 @@ class Event:
                 raise_error(KeyError, desc, self.sim.curr_step)
 
             self.v_effect_dur = math.inf if "effect_duration" not in veh_params.keys() else veh_params["effect_duration"]
-            self.v_actions, self.v_base, self.affected_vehicles = veh_params["actions"], {}, {}
+            self.v_actions, self.v_base, self.affected_vehicles = {} if "actions" not in veh_params else veh_params["actions"], {}, {}
 
             if "vehicle_types" in veh_params.keys():
                 self.vehicle_types = veh_params["vehicle_types"]

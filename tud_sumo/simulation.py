@@ -71,6 +71,7 @@ class Simulation:
         self._vehicle_types = set([])
         self._added_vehicle_types = set([])
         self._known_vehicles = {}
+        self._stopped_vehicles = set([])
         self._trips = {"incomplete": {}, "completed": {}}
 
         self._v_in_funcs = []
@@ -2156,7 +2157,7 @@ class Simulation:
             `n_vehicles` (int): Number of vehicles in the incident, if randomly chosen
             `vehicle_separation` (float): Factor denoting how separated randomly chosen vehicles are (0.1-1)
             `assert_n_vehicles` (bool): Denotes whether to throw an error if the correct number of vehicles cannot be found
-            `edge_speed` (int, float, optional):New max speed for edges where incident vehicles are located (defaults to 15km/h or 10mph)
+            `edge_speed` (int, float, None, optional): New max speed for edges where incident vehicles are located (defaults to 15km/h or 10mph). Set to `None` to not change speed.
             `highlight_vehicles` (bool): Denotes whether to highlight vehicles in the SUMO GUI
             `incident_id` (str, optional):Incident event ID used in the simulation data file (defaults to '_incident_{n}_')
 
@@ -2173,7 +2174,7 @@ class Simulation:
             incident_id = "incident_{0}".format(id_idx)
 
         event_dict = {"start_time": (self.curr_step + 1) * self.step_length, "end_time": (self.curr_step + duration) * self.step_length,
-                      "vehicles": {"actions": {"speed": 0}, "effect_duration": duration, "remove_affected_vehicles": True,
+                      "vehicles": {"effect_duration": duration, "remove_affected_vehicles": True,
                                    "speed_safety_checks": False, "lc_safety_checks": False}}
         
         check_n_vehicles = vehicle_ids == None
@@ -2259,6 +2260,7 @@ class Simulation:
                     raise_error(KeyError, desc, self.curr_step)
                 elif highlight_vehicles:
                     self.set_vehicle_vals(vehicle_id, highlight=True)
+                    self.stop_vehicle(vehicle_id, duration=duration)
 
             event_dict["vehicles"]["vehicle_ids"] = vehicle_ids
         
@@ -2536,6 +2538,7 @@ class Simulation:
             `route_edges` (list, optional): Set vehicle route by list of edges
             `speed_safety_checks` (bool, optional): (**Indefinitely**) set whether speed/acceleration safety constraints are followed when setting speed
             `lc_safety_checks` (bool, optional): (**Indefinitely**) set whether lane changing safety constraints are followed when changing lane
+            `stop` (bool, optional): Stop the vehicle at its current position
         """
 
         if isinstance(vehicle_ids, str): vehicle_ids = [vehicle_ids]
@@ -2667,6 +2670,16 @@ class Simulation:
                             traci.vehicle.setLaneChangeMode(vehicle_id, value)
                         else:
                             desc = "({0}): Invalid speed_safety_checks value '{1}' (must be (str), not '{2}').".format(command, value, type(value).__name__)
+                            raise_error(TypeError, desc, self.curr_step)
+
+                    case "stop":
+                        if isinstance(value, bool):
+                            if value and vehicle_id not in self._stopped_vehicles:
+                                self.stop_vehicle(vehicle_id)
+                            elif not value:
+                                self.resume_vehicle(vehicle_id)
+                        else:
+                            desc = f"({command}: Invalid stop value '{value}' (must be bool, not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
     def set_vehicle_type_vals(self, vehicle_types: list|tuple|str, **kwargs) -> None:
@@ -3242,7 +3255,7 @@ class Simulation:
 
         **Vehicle Status**:
         '_speed_', '_is_stopped_', '_max_speed_', '_allowed_speed_', '_acceleration_', '_position_', '_altitude_',
-        '_heading_', '_edge_id_', '_lane_id_', '_lane_idx_', '_route_id_', '_route_idx_', '_route_edges_',
+        '_heading_', '_edge_id_', '_lane_id_', '_lane_idx_', '_route_id_', '_route_idx_', '_route_edges_', '_next_edge_id_',
         '_leader_id_', '_leader_dist_'
 
         **Trip Data**:
@@ -3388,6 +3401,20 @@ class Simulation:
                     case "route_edges":
                         route = list(traci.vehicle.getRoute(vehicle_id))
                         data_vals[data_key] = route
+
+                    case "next_edge_id":
+                        if "route_edges" in data_vals: route_edges = data_vals["route_edges"]
+                        else: route_edges = list(traci.vehicle.getRoute(vehicle_id))
+
+                        if "edge_id" in data_vals: edge_id = data_vals["edge_id"]
+                        else: edge_id = traci.vehicle.getRoadID(vehicle_id)
+
+                        edge_idx = route_edges.index(edge_id)
+                        if edge_idx == len(route_edges) - 1: data_vals[data_key] = None
+                        else:
+                            next_edges = route_edges[route_edges.index(edge_id) + 1:]
+                            filtered = [item for item in next_edges if not item.startswith(':')]
+                            data_vals[data_key] = filtered[0] if filtered else None
 
                     case "leader_id":
                         if subscription_key in subscribed_data: leader_data = subscribed_data[subscription_key]
@@ -3563,7 +3590,7 @@ class Simulation:
         '_curr_travel_time_', '_ff_travel_time_', '_emissions_', '_length_', '_max_speed_'
         
         **Edge only**:
-        '_connected_edges_', '_incoming_edges_', '_outgoing_edges_', '_street_name_', '_n_lanes_', '_lane_ids_', '_junction_ids_'
+        '_connected_edges_', '_incoming_edges_', '_outgoing_edges_', '_street_name_', '_n_lanes_', '_lane_ids_', '_junction_ids_', '_linestring_'
         
         **Lane only**: 
         '_edge_id_', '_n_links_', '_allowed_', '_disallowed_', '_left_lc_', '_right_lc_'.
@@ -4010,6 +4037,72 @@ class Simulation:
                 desc = "Controller with ID '{0}' not found.".format(controller_id)
                 raise_error(KeyError, desc, self.curr_step)
 
+    def stop_vehicle(self, vehicle_id: str, duration: int|float|None = None, lane_idx: int|None = None, pos: int|float|None = None) -> None:
+        """
+        Stops a vehicle at a given/random position along the next edge. The vehicle will try to stay
+        in the same lane when stopping if available. If not, the vehicle will stop in the outermost lane.
+        An error is thrown if the vehicle has no next edge ID (i.e. it is at the end of its route).
+
+        Args:
+            `vehicle_id` (str): Vehicle ID
+            `duration` (int, float, optional): Duration to stop for in seconds (if not given, the vehicle will stop indefinitely)
+            `lane_idx` (int, optional): Lane index to stop in (if not given, the vehicle will try to stop in its current lane)
+            `pos` (int, float, optional): Position to stop at as a percent of the edge's length (if not given, a random position is chosen)
+        """
+
+        data = self.get_vehicle_vals(vehicle_id, ["next_edge_id", "lane_idx"])
+        if data["next_edge_id"] == None:
+            desc = f"Vehicle '{vehicle_id}' has no next edge ID and cannot stop."
+            raise_error(ValueError, desc, self.curr_step)
+
+        edge_data = self.get_geometry_vals(data["next_edge_id"], ["n_lanes", "length"]) 
+    
+        if pos == None: pos = random()
+        elif not isinstance(pos, (int, float)):
+            desc = f"Invalid pos value '{pos}' (must be [int|float], not '{type(pos).__name__}')."
+            raise_error(TypeError, desc, self.curr_step)
+        elif pos < 0 or pos > 1:
+            desc = f"Invalid pos value '{pos}' (must be 0 <= pos < 1)."
+            raise_error(ValueError, desc, self.curr_step)
+
+        if lane_idx == None:
+            lane_idx = min(data["lane_idx"], edge_data["n_lanes"] - 1)
+        elif not isinstance(lane_idx, int):
+            desc = f"Invalid lane_idx value '{lane_idx}' (must be int, not '{type(lane_idx).__name__}')."
+            raise_error(TypeError, desc, self.curr_step)
+        elif lane_idx < 0 or lane_idx >= edge_data["n_lanes"]:
+            desc = f"Invalid lane_idx value '{lane_idx}' (must be 0 <= lane_idx < {edge_data['n_lanes']})."
+            raise_error(ValueError, desc, self.curr_step)
+
+        pos = pos * convert_units(edge_data["length"], self._l_dist_unit, "metres")
+        if duration == None: traci.vehicle.setStop(vehicle_id, data["next_edge_id"], pos=pos, laneIndex=lane_idx)
+        else: traci.vehicle.setStop(vehicle_id, data["next_edge_id"], pos=pos, laneIndex=lane_idx, duration=float(duration))
+        
+        self._stopped_vehicles.add(vehicle_id)
+
+    def resume_vehicle(self, vehicle_id: str) -> None:
+        """
+        Resumes a previously stopped vehicle.
+        
+        Args:
+            `vehicle_id` (str): Vehicle ID
+        """
+
+        if not self.vehicle_exists(vehicle_id):
+            desc = f"Vehicle with ID '{vehicle_id}' not found."
+            raise_error(KeyError, desc, self.curr_step)
+
+        if vehicle_id not in self._stopped_vehicles and not self._suppress_warnings:
+            raise_warning(f"Vehicle '{vehicle_id}' is not stopped.")
+
+        else:
+            if self.get_vehicle_vals(vehicle_id, "is_stopped"):
+                traci.vehicle.resume(vehicle_id)
+                self._stopped_vehicles.remove(vehicle_id)
+            
+            elif not self._suppress_warnings:
+                raise_warning(f"Vehicle '{vehicle_id}' has not stopped yet (cannot resume).")
+                
     def gui_track_vehicle(self, vehicle_id: str, view_id: str|None = None, highlight: bool = True) -> None:
         """
         Sets GUI view to track a vehicle by ID.
@@ -4699,7 +4792,7 @@ class TrackedEdge:
             veh_data, total_speed = [], 0
             for veh_id in last_step_vehs:
                 vals = self.sim.get_vehicle_vals(veh_id, ["speed", "position", "lane_idx"])
-                pos = self._get_distance_on_road(vals["position"])
+                pos = _get_distance_on_road(vals["position"], self.linestring)
                 if self.sim.units in ['IMPERIAL']: pos *= 0.0006213712
                 veh_data.append((veh_id, pos, vals["speed"], vals["lane_idx"]))
                 total_speed += vals["speed"]
@@ -4719,13 +4812,13 @@ class TrackedEdge:
             self.densities.append(density)
             self.occupancies.append(occupancy)
             
-    def _get_distance_on_road(self, veh_coors):
-        line = LineString(self.linestring)
-        p = Point(veh_coors)
-        p2 = line.interpolate(line.project(p))
-        x_val = line.line_locate_point(p2, False)
-        x_pct = x_val/line.length
-        return x_pct
+def _get_distance_on_road(veh_coors, linestring):
+    line = LineString(linestring)
+    p = Point(veh_coors)
+    p2 = line.interpolate(line.project(p))
+    x_val = line.line_locate_point(p2, False)
+    x_pct = x_val/line.length
+    return x_pct
 
 def print_summary(sim_data: dict|str, save_file: str|None=None, tab_width: int=58):
     """
