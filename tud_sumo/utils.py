@@ -59,11 +59,12 @@ valid_data_keys = { "detector": {
                         "vehicle_ids":          {"class": "both", "setter": False, "tc": tc.LAST_STEP_VEHICLE_ID_LIST},
                         "avg_vehicle_length":   {"class": "both", "setter": False, "tc": tc.LAST_STEP_LENGTH},
                         "halting_no":           {"class": "both", "setter": False, "tc": tc.LAST_STEP_VEHICLE_HALTING_NUMBER},
-                        "vehicle_speed":        {"class": "both", "setter": False, "tc": tc.LAST_STEP_MEAN_SPEED},
+                        "vehicle_speed":        {"class": "both", "setter": False, "tc": tc.LAST_STEP_VEHICLE_ID_LIST},
                         "vehicle_occupancy":    {"class": "both", "setter": False, "tc": tc.LAST_STEP_OCCUPANCY},
-                        #"vehicle_flow":         {"class": "both", "setter": False, "tc": None},
-                        #"vehicle_density":      {"class": "both", "setter": False, "tc": None},
-                        #"vehicle_delay":        {"class": "both", "setter": False, "tc": None},
+                        "vehicle_flow":         {"class": "both", "setter": False, "tc": None},
+                        "vehicle_density":      {"class": "both", "setter": False, "tc": None},
+                        "vehicle_tts":          {"class": "both", "setter": False,  "tc": tc.LAST_STEP_VEHICLE_NUMBER},
+                        "vehicle_delay":        {"class": "both", "setter": False,  "tc": None},
                         "curr_travel_time":     {"class": "both", "setter": False, "tc": None},
                         "ff_travel_time":       {"class": "both", "setter": False, "tc": None},
                         "emissions":            {"class": "both", "setter": False, "tc": None},
@@ -83,6 +84,7 @@ valid_data_keys = { "detector": {
                         "disallowed":           {"class": "lane", "setter": True,  "tc": None},
                         "left_lc":              {"class": "lane", "setter": True,  "tc": None},
                         "right_lc":             {"class": "lane", "setter": True,  "tc": None},
+
                     }}
 
 traci_constants = {}

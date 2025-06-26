@@ -63,6 +63,13 @@ class Simulation:
         self._all_routes = None
         self._new_routes = {}
 
+        self._last_step_delay = {}
+        self._last_step_flow = {}
+        self._last_step_density = {}
+        self._lane_to_edges = {}
+
+        self._include_insertion_delay = False
+
         self._get_individual_vehicle_data = True
         self._all_curr_vehicle_ids = set([])
         self._all_loaded_vehicle_ids = set([])
@@ -97,7 +104,7 @@ class Simulation:
 
     def __dict__(self): return {} if self._all_data == None else self._all_data
 
-    def start(self, config_file: str|None = None, net_file: str|None = None, route_file: str|None = None, add_file: str|None = None, gui_file: str|None = None, cmd_options: list|None = None, units: str|int = 1, get_individual_vehicle_data: bool = True, automatic_subscriptions: bool = True, suppress_warnings: bool = False, suppress_traci_warnings: bool = True, suppress_pbar: bool = False, seed: str = "random", gui: bool = False, sumo_home: str|None = None) -> None:
+    def start(self, config_file: str|None = None, net_file: str|None = None, route_file: str|None = None, add_file: str|None = None, gui_file: str|None = None, cmd_options: list|None = None, units: str|int = 1, get_individual_vehicle_data: bool = True, include_insertion_delay: bool = False, automatic_subscriptions: bool = True, suppress_warnings: bool = False, suppress_traci_warnings: bool = True, suppress_pbar: bool = False, seed: str = "random", gui: bool = False, sumo_home: str|None = None) -> None:
         """
         Intialises SUMO simulation.
 
@@ -110,6 +117,7 @@ class Simulation:
             `cmd_options` (list, optional): List of any other command line options
             `units` (str, int): Data collection units [1 (metric) | 2 (IMPERIAL) | 3 (UK)] (defaults to 'metric')
             `get_individual_vehicle_data` (bool): Denotes whether to get individual vehicle data (set to `False` to improve performance)
+            `include_insertion_delay` (bool): Denotes whether to include insertion delay (delay of vehicles waiting to be inserted into the simulation) in network-wide delay calculations
             `automatic_subscriptions` (bool): Denotes whether to automatically subscribe to commonly used vehicle data (speed and position, defaults to `True`)
             `suppress_warnings` (bool): Suppress simulation warnings
             `suppress_traci_warnings` (bool): Suppress warnings from TraCI
@@ -293,6 +301,7 @@ class Simulation:
             self._all_routes[route_id] = traci.route.getEdges(route_id)
 
         self._get_individual_vehicle_data = get_individual_vehicle_data
+        self._include_insertion_delay = include_insertion_delay
         self._automatic_subscriptions = automatic_subscriptions
 
         if self._verbose:
@@ -3517,6 +3526,7 @@ class Simulation:
     def _get_all_vehicle_data(self, vehicle_types: list|tuple|None = None) -> dict:
         """
         Collects aggregated vehicle data (no. vehicles & no. waiting vehicles) and all individual vehicle data.
+        Also calculates edge/lane flow, delay and density for the last time step.
         
         Args:
             `vehicle_types` (list, tuple, optional):Type(s) of vehicles to include
@@ -3524,6 +3534,24 @@ class Simulation:
         Returns:
             dict: no vehicles, no waiting, all vehicle data
         """
+
+        if len(self._last_step_delay) == 0 or len(self._last_step_flow) == 0:
+            for lane_id in self._all_lanes:
+                if not lane_id.startswith(":"):
+                    self._last_step_delay[lane_id] = 0
+                    self._last_step_flow[lane_id] = 0
+                    self._last_step_density[lane_id] = 0
+
+                    edge_id = self.get_geometry_vals(lane_id, "edge_id")
+                    self._last_step_delay[edge_id] = 0
+                    self._last_step_flow[edge_id] = 0
+                    self._last_step_density[edge_id] = 0
+                    self._lane_to_edges[lane_id] = edge_id
+        
+        else:
+            self._last_step_delay = {g_id: 0 for g_id in self._last_step_delay}
+            self._last_step_flow = {g_id: 0 for g_id in self._last_step_flow}
+            self._last_step_density = {g_id: 0 for g_id in self._last_step_density}
 
         all_vehicle_data = {}
         total_vehicle_data = {"no_vehicles": 0, "no_waiting": 0, "delay": 0}
@@ -3561,23 +3589,48 @@ class Simulation:
             free_flow_speed = sum(allowed_speeds[lane_id]) / len(allowed_speeds[lane_id]) # m/s
 
             if average_speed == 0:
-                # delay = TTS on lane if speed == 0
-                lane_delay = len(lane_data) * self.step_length
+                # delay = TTS on lane if speed == 0, and flow = 0
+                lane_delay, lane_flow = len(lane_data) * self.step_length, 0
 
-            elif average_speed < free_flow_speed:
-
+            else:
                 lane_length = convert_units(self._lane_info[lane_id]["length"], self._l_dist_unit, "metres")
 
                 # step flow (veh) = speed (m/s) x density (veh/m) x step length (s)
-                flow = (average_speed * (len(lane_data) / lane_length)) * self.step_length
-                lane_delay = flow * ((lane_length / average_speed) - (lane_length / free_flow_speed))
+                lane_flow = (average_speed * (len(lane_data) / lane_length)) * self.step_length
+                lane_delay = lane_flow * ((lane_length / average_speed) - (lane_length / free_flow_speed))
+
+            # Bound delay to ≥ 0, to avoid cases where average_speed > free_flow_speed
+            lane_delay = max(0, lane_delay)
 
             total_vehicle_data["delay"] += lane_delay
+
+            if lane_id in self._last_step_delay:
+                edge_id = self._lane_to_edges[lane_id]
+
+                self._last_step_delay[lane_id] = lane_delay
+                self._last_step_delay[edge_id] += lane_delay
+
+                # Convert flow to veh/hr
+                lane_flow = (lane_flow / self.step_length) * 3600
+                self._last_step_flow[lane_id] = lane_flow
+                self._last_step_flow[edge_id] += lane_flow
+
+                # Calculate lane density as n_vehicles / lane length (in long dist units (km or mi))
+                self._last_step_density[lane_id] = len(lane_data) / self._lane_info[lane_id]["length"]
+                self._last_step_density[edge_id] += len(lane_data) # temporarily use ls density to store n vehicles on the edge
+
+        for edge_id in self._all_edges:
+            if edge_id in self._last_step_density:
+                # Calculate edge density as n_vehicles / edge length
+                self._last_step_density[edge_id] /= self._edge_info[edge_id]["length"]
 
         total_vehicle_data["to_depart"] = len(self._all_to_depart_vehicle_ids)
 
         # Delay of vehicles waiting to be inserted into the simulation (veh*s)
-        #total_vehicle_data["insertion_delay"] = total_vehicle_data["to_depart"] * self.step_length
+        insertion_delay = total_vehicle_data["to_depart"] * self.step_length
+        total_vehicle_data["insertion_delay"] = insertion_delay
+        if self._include_insertion_delay:
+            total_vehicle_data["delay"] += insertion_delay
 
         return total_vehicle_data, all_vehicle_data
     
@@ -3586,15 +3639,17 @@ class Simulation:
         Get data values for specific edge or lane using a list of data keys. Valid data keys are:
         
         **Edge or Lane**:
-        '_vehicle_count_', '_vehicle_ids_', '_vehicle_speed_', '_avg_vehicle_length_', '_halting_no_', '_vehicle_occupancy_',
-        '_curr_travel_time_', '_ff_travel_time_', '_emissions_', '_length_', '_max_speed_'
-        
+        '_vehicle_count_', '_vehicle_ids_', '_avg_vehicle_length_', '_halting_no_', '_vehicle_speed_', '_vehicle_occupancy_',
+        '_vehicle_flow_', '_vehicle_density_', '_vehicle_tts_', '_vehicle_delay_', '_curr_travel_time_', '_ff_travel_time_',
+        '_emissions_', '_length_', '_max_speed_'
+
         **Edge only**:
-        '_connected_edges_', '_incoming_edges_', '_outgoing_edges_', '_street_name_', '_n_lanes_', '_lane_ids_', '_junction_ids_', '_linestring_'
-        
-        **Lane only**: 
-        '_edge_id_', '_n_links_', '_allowed_', '_disallowed_', '_left_lc_', '_right_lc_'.
-        
+        '_connected_edges_', '_incoming_edges_', '_outgoing_edges_', '_junction_ids_', '_linestring_', '_street_name_',
+        '_n_lanes_', '_lane_ids_'
+
+        **Lane only**:
+        '_edge_id_', '_n_links_', '_allowed_', '_disallowed_', '_left_lc_', '_right_lc_'
+
         Args:
             `geometry_ids` (str, int): Edge/lane ID or list of IDs
             `data_keys` (str, list): Data key or list of keys
@@ -3653,10 +3708,36 @@ class Simulation:
                         data_vals[data_key] = list(vehicle_ids)
 
                     case "vehicle_speed":
-                        if subscription_key in subscribed_data: vehicle_speed = subscribed_data[subscription_key]
-                        else: vehicle_speed = g_class.getLastStepMeanSpeed(geometry_id)
+                        if subscription_key in subscribed_data: vehicle_ids = subscribed_data[subscription_key]
+                        else: vehicle_ids = list(g_class.getLastStepVehicleIDs(geometry_id))
 
-                        data_vals[data_key] = convert_units(vehicle_speed, "m/s", self._speed_unit)
+                        if len(vehicle_ids) == 0: vehicle_speed = None
+                        elif len(vehicle_ids) == 1: vehicle_speed = self.get_vehicle_vals(vehicle_ids, "speed")
+                        else: vehicle_speed = sum(self.get_vehicle_vals(vehicle_ids, "speed").values()) / len(vehicle_ids)
+
+                        data_vals[data_key] = vehicle_speed
+                        
+                    case "vehicle_density":
+                        if len(self._last_step_density) == 0: density = 0
+                        else: density = self._last_step_density[geometry_id]
+                        data_vals[data_key] = density
+
+                    case "vehicle_flow":
+                        if len(self._last_step_flow) == 0: flow = 0
+                        else: flow = self._last_step_flow[geometry_id]
+                        data_vals[data_key] = flow
+
+                    case "vehicle_delay":
+                        if len(self._last_step_delay) == 0: delay = 0
+                        else: delay = self._last_step_delay[geometry_id]
+                        data_vals[data_key] = delay
+
+                    case "vehicle_tts":
+                        if "vehicle_ids" in data_vals: vehicle_count = len(data_vals["vehicle_ids"])
+                        elif traci_constants["geometry"]["vehicle_ids"] in subscribed_data: vehicle_count = len(list(subscribed_data[traci_constants["geometry"]["vehicle_ids"]]))
+                        elif subscription_key in subscribed_data: vehicle_count = subscribed_data[subscription_key]
+                        else: vehicle_count = g_class.getLastStepVehicleNumber(geometry_id)
+                        data_vals[data_key] = vehicle_count * self.step_length
 
                     case "avg_vehicle_length":
                         if subscription_key in subscribed_data: length = subscribed_data[subscription_key]
@@ -4660,30 +4741,16 @@ class TrackedJunction:
                 if self.ramp_edges != None:
                     queuing_vehicles = self.sim.get_last_step_geometry_vehicles(self.ramp_edges, flatten=True)
                     queuing_vehicles = [veh_id for veh_id in queuing_vehicles if self.sim.vehicle_exists(veh_id)]
-                    vehicle_data = self.sim.get_vehicle_vals(queuing_vehicles, ["speed", "allowed_speed"])
-
-                    if len(queuing_vehicles) > 1:
-                        speeds = [data["speed"] for data in vehicle_data.values()]
-                        allowed_speeds = [data["allowed_speed"] for data in vehicle_data.values()]
-                    elif len(queuing_vehicles) == 1:
-                        speeds = [vehicle_data["speed"]]
-                        allowed_speeds = [vehicle_data["allowed_speed"]]
-                    else: speeds, allowed_speeds = [], []
 
                     self._queue_lengths.append(len([veh_id for veh_id in queuing_vehicles if self.sim.get_vehicle_vals(veh_id, "is_stopped")]))
 
+                    queue_delay = 0
                     if len(queuing_vehicles) > 0:
-                        avg_speed = sum(speeds) / len(speeds)
-                        ff_speed = sum(allowed_speeds) / len(allowed_speeds)
+                        for ramp_edge in self.ramp_edges:
+                            queue_delay += self.sim.get_geometry_vals(ramp_edge, "vehicle_delay")
+                    self._queue_delays.append(queue_delay)
 
-                        if avg_speed == 0: self._queue_delays.append(len(speeds))
-                        elif avg_speed >= ff_speed: self._queue_delays.append(0)
-                        else:
-                            ramp_length = convert_units(self._ramp_length, self.sim._l_dist_unit, "metres")
-                            flow = (avg_speed * (len(queuing_vehicles) / ramp_length)) * self.sim.step_length
-                            self._queue_delays.append(flow * ((ramp_length / avg_speed) - (ramp_length / ff_speed)))
-
-                    else: self._queue_delays.append(0)
+                    if self.id == "crooswijk_meter": print(f"No vehs: {len(self.sim.get_last_step_geometry_vehicles(self.ramp_edges, flatten=True))}, queuing: {self._queue_lengths[-1]}, delay: {self._queue_delays[-1]}s\n")
                 
                 elif self.queue_detector != None:
                     queuing_vehicles = self.sim.get_last_step_detector_vehicles(self.queue_detector, flatten=True)
