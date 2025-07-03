@@ -210,9 +210,9 @@ class Event:
         else:
             self.end_time = math.inf
 
-        if "edges" not in event_params.keys() and "vehicles" not in event_params.keys():
-            desc = "Neither 'edges' or 'vehicles' parameters are given and one or both is required."
-            raise_error(KeyError, desc, self.sim.curr_step)
+        #if "edges" not in event_params.keys() and "vehicles" not in event_params.keys():
+        #    desc = "Neither 'edges' or 'vehicles' parameters are given and one or both is required."
+        #    raise_error(KeyError, desc, self.sim.curr_step)
         
         if "edges" in event_params.keys():
             edge_params = event_params["edges"]

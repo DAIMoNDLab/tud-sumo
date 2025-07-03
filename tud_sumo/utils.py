@@ -31,6 +31,9 @@ valid_data_keys = { "detector": {
                         "is_stopped":    {"getter": True,  "setter": False, "tc": tc.VAR_SPEED},
                         "max_speed":     {"getter": True,  "setter": True,  "tc": tc.VAR_MAXSPEED},
                         "allowed_speed": {"getter": True,  "setter": False, "tc": tc.VAR_ALLOWED_SPEED},
+                        "speed_factor":  {"getter": True,  "setter": True,  "tc": tc.VAR_SPEED_FACTOR},
+                        "headway":       {"getter": True,  "setter": True,  "tc": tc.VAR_TAU},
+                        "imperfection":  {"getter": True,  "setter": True,  "tc": tc.VAR_IMPERFECTION},
                         "acceleration":  {"getter": True,  "setter": True,  "tc": tc.VAR_ACCELERATION},
                         "position":      {"getter": True,  "setter": False, "tc": tc.VAR_POSITION},
                         "altitude":      {"getter": True,  "setter": False, "tc": tc.VAR_POSITION3D},
@@ -52,7 +55,8 @@ valid_data_keys = { "detector": {
                         "next_edge_id":  {"getter": True,  "setter": False, "tc": None},
                     },
                     "vehicle_type": ["vehicle_class", "colour", "length", "width", "height", "max_speed", "speed_factor", "speed_dev", #"mass",
-                                     "min_gap", "acceleration", "deceleration", "tau", "max_lateral_speed", "emission_class", "gui_shape"
+                                     "min_gap", "acceleration", "deceleration", "headway", "imperfection", "max_lateral_speed",
+                                     "emission_class", "gui_shape"
                     ],
                     "geometry": {
                         "vehicle_count":        {"class": "both", "setter": False, "tc": tc.LAST_STEP_VEHICLE_NUMBER},
