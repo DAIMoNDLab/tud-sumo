@@ -94,6 +94,8 @@ class Simulation:
 
         self._weather_active = False
         self._weather_base_params = {"lanes": {}, "vtypes": {}}
+        self._weather_activation_times = []
+        self._weather_deactivation_times = []
 
         from .__init__ import __version__
         self._tuds_version = __version__
@@ -2282,30 +2284,38 @@ class Simulation:
         self.add_events({incident_id: event_dict})
         return True
     
-    def add_weather_effects(self, headway_reduction: int|float = 0.2, imperfection_increase: int|float = 0.2, acceleration_reduction: int|float = 0.2, speed_f_reduction: float|int = 0.2, min_lane_speed: int|float = 30, max_speed_reduction: int|float = 0.2, speed_reduction_scale: int|float = 0.03) -> None:
+    def add_weather_effects(self, strength: float = 0.2, *, headway_increase: int|float|None = None, imperfection_increase: int|float|None = None, acceleration_reduction: int|float|None = None, speed_f_reduction: float|int|None = None, max_speed_reduction: int|float|None = None, min_lane_speed: int|float = 30, speed_reduction_scale: int|float = 0.03) -> None:
         """
         Simulates weather effects by reducing headway (tau), vehicle acceleration/deceleration/speed factor and
-        lane speeds and by increasing driver imperfection (sigma).
+        lane speeds and by increasing driver imperfection (sigma). All effects can be set using the strength
+        parameter, or defined individually.
 
         Args:
-            `headway_reduction` (int, float): Percent reduction to vehicle type desired time headway (tau)
-            `imperfection_increase` (int, float): Percent increase to vehicle type imperfection value (sigma)
-            `acceleration_reduction` (int, float): Percent reduction to vehicle type maximum acceleration/deceleration
-            `speed_f_reduction` (int, float): Percent reduction to vehicle type speed factor, used to calculate vehicle speed based on speed limit
+            `strength` (float): Used as the default reduction/increase value when not given (defaults to 0.2)
+            `headway_increase` (int, float, optional): Percent increase to vehicle type desired time headway (tau)
+            `imperfection_increase` (int, float, optional): Percent increase to vehicle type imperfection value (sigma)
+            `acceleration_reduction` (int, float, optional): Percent reduction to vehicle type maximum acceleration/deceleration
+            `speed_f_reduction` (int, float, optional): Percent reduction to vehicle type speed factor, used to calculate vehicle speed based on speed limit
+            `max_speed_reduction` (int, float, optional): Maximum percent reduction to lane speed limits
             `min_lane_speed` (int, float): Minimum lane speed limit to apply reduction (defaults to 30km/h)
-            `max_speed_reduction` (int, float): Maximum percent reduction to lane speed limits
             `speed_reduction_scale` (int, float): Speed reduction drop off (defaults to 0.03)
         """
+
+        headway_increase = strength if headway_increase == None else headway_increase
+        imperfection_increase = strength if imperfection_increase == None else imperfection_increase
+        acceleration_reduction = strength if acceleration_reduction == None else acceleration_reduction
+        speed_f_reduction = strength if speed_f_reduction == None else speed_f_reduction
+        max_speed_reduction = strength if max_speed_reduction == None else max_speed_reduction
 
         for vtype in self.get_vehicle_types():
             vtype_data = self.get_vehicle_type_vals(vtype, ["headway", "imperfection", "acceleration", "deceleration", "speed_factor"])
             headway, imperfection = vtype_data["headway"], vtype_data["imperfection"]
             accel, decel = vtype_data["acceleration"], vtype_data["deceleration"]
             speedf = vtype_data["speed_factor"]
-            self.set_vehicle_type_vals(vtype, headway=headway*(1-headway_reduction),
+            self.set_vehicle_type_vals(vtype, headway=headway*(1+headway_increase),
                                        imperfection=min(1, max(0, imperfection*(1+imperfection_increase))),
-                                       acceleration=accel*(1-acceleration_reduction),
-                                       deceleration=decel*(1-acceleration_reduction),
+                                       acceleration=max(0, accel*(1-acceleration_reduction)),
+                                       deceleration=max(0, decel*(1-acceleration_reduction)),
                                        speed_factor=speedf*(1-speed_f_reduction))
             
             self._weather_base_params["vtypes"][vtype] = (headway, imperfection, accel, decel, speedf)
@@ -2319,6 +2329,8 @@ class Simulation:
                 self._weather_base_params["lanes"][lane_id] = curr_speed
 
         self._weather_active = True
+        if self.curr_step not in self._weather_activation_times:
+            self._weather_activation_times.append(self.curr_step)
 
     def remove_weather_effects(self, vehicle_types: bool = True, lanes: bool = True) -> None:
         """
@@ -2340,7 +2352,11 @@ class Simulation:
             for lane_id, orig_speed in self._weather_base_params["lanes"].items():
                 self.set_geometry_vals(lane_id, max_speed=orig_speed)
 
-        self._weather_active = not (vehicle_types and lanes)
+        if vehicle_types and lanes:
+            self._weather_active = False
+            if self.curr_step not in self._weather_deactivation_times:
+                self._weather_deactivation_times.append(self.curr_step)
+                # Use activation/deactivation times to add to plots, as events or individually
 
     def is_weather_active(self) -> bool:
         """ Returns whether lane or vehicle type weather effects are currently active. """
