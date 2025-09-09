@@ -3721,8 +3721,8 @@ class Simulation:
 
                 lane_id, speed, allowed_speed = vehicle_data["lane_id"], vehicle_data["speed"], vehicle_data["allowed_speed"]
 
-                # Vehicle is on an internal edge (in an intersection) - set to its previous lane
-                if lane_id.startswith(':'): lane_id = self._network.getLane(lane_id).getIncoming()[0].getID()
+                # Vehicle is on an internal edge (in an intersection) - set to its last non-internal lane
+                while lane_id.startswith(':'): lane_id = self._network.getLane(lane_id).getIncoming()[0].getID()
 
                 # Convert allowed/measured speeds to m/s
                 if lane_id not in lane_speeds: lane_speeds[lane_id], allowed_speeds[lane_id] = [], []
