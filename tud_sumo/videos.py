@@ -43,7 +43,15 @@ class Recorder():
             raise_error(KeyError, desc, self.sim.curr_step)
         else: return self._recordings[recording_id]
     
-    def save_recording(self, recording_id: str, video_filename: str|None = None, speed: int|float|None = None, delete_frames: bool = True, delete_view: bool = True, overwrite: bool = True) -> None:
+    def save_recording(self,
+                       recording_id: str,
+                       *,
+                       video_filename: str | None = None,
+                       speed: int | float | None = None,
+                       delete_frames: bool = True,
+                       delete_view: bool = True,
+                       overwrite: bool = True
+                      ) -> None:
         """
         Saves a recording as a video file.
 
@@ -134,7 +142,17 @@ class Recorder():
         
         if not os.path.exists(frames_loc): os.makedirs(frames_loc)
 
-    def record_network(self, bounds: list|tuple, recording_id: str, video_filename: str|None = None, zoom: int|float|None = None, speed: int|float|None = 1, frames_loc: str|None = None, empty_frames_loc: bool = True, view_id: str|None = None) -> None:
+    def record_network(self,
+                       bounds: list | tuple,
+                       recording_id: str,
+                       *,
+                       video_filename: str | None = None,
+                       zoom: int | float | None = None,
+                       speed: int | float | None = 1,
+                       frames_loc: str | None = None,
+                       empty_frames_loc: bool = True,
+                       view_id: str | None = None
+                      ) -> None:
         """
         Records a location on the network.
 
@@ -176,7 +194,17 @@ class Recorder():
 
         self.sim.set_view(view_id, bounds, zoom)
 
-    def record_vehicle(self, vehicle_id: str, recording_id: str, video_filename: str|None = None, zoom: int|float|None = None, speed: int|float|None = 1, frames_loc: str|None = None, empty_frames_loc: bool = True, view_id: str|None = None, highlight: bool = True) -> None:
+    def record_vehicle(self,
+                       vehicle_id: str,
+                       recording_id: str,
+                       *,
+                       video_filename: str | None = None,
+                       zoom: int | float | None = None,
+                       speed: int | float | None = 1,
+                       frames_loc: str | None = None,
+                       empty_frames_loc: bool = True,
+                       view_id: str | None = None,
+                       highlight: bool = True) -> None:
         """
         Tracks and records a vehicle until it has left the network (or is saved earlier).
 
@@ -222,5 +250,5 @@ class Recorder():
                                           "view_id": view_id,
                                           "speed": speed}
 
-        self.sim.gui_track_vehicle(vehicle_id, view_id, highlight)
+        self.sim.gui_track_vehicle(vehicle_id, view_id, highlight=highlight)
         self.sim.set_view(view_id, None, zoom)

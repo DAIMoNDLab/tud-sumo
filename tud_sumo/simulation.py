@@ -14,11 +14,11 @@ from .utils import *
 class Simulation:
     """ Main simulation interface."""
 
-    def __init__(self, scenario_name: str|None = None, scenario_desc: str|None = None, verbose: bool = True) -> None:
+    def __init__(self, scenario_name: str | None = None, scenario_desc: str | None = None, *, verbose: bool = True) -> None:
         """
         Args:
-            `scenario_name` (str, optional):Scenario label saved to simulation object (defaults to name of '_.sumocfg_')
-            `scenario_desc` (str, optional):Simulation scenario description, saved along with all files
+            `scenario_name` (str, optional): Scenario label saved to simulation object (defaults to name of '_.sumocfg_')
+            `scenario_desc` (str, optional): Simulation scenario description, saved along with all files
             `verbose` (bool): Denotes whether to print simulation information
         """
 
@@ -106,7 +106,25 @@ class Simulation:
 
     def __dict__(self): return {} if self._all_data == None else self._all_data
 
-    def start(self, config_file: str|None = None, net_file: str|None = None, route_file: str|None = None, add_file: str|None = None, gui_file: str|None = None, cmd_options: list|None = None, units: str|int = 1, get_individual_vehicle_data: bool = True, include_insertion_delay: bool = False, automatic_subscriptions: bool = True, suppress_warnings: bool = False, suppress_traci_warnings: bool = True, suppress_pbar: bool = False, seed: str = "random", gui: bool = False, sumo_home: str|None = None) -> None:
+    def start(self, 
+              config_file: str | None = None,
+              *, 
+              net_file: str | None = None,
+              route_file: str | None = None,
+              add_file: str | None = None,
+              gui_file: str | None = None,
+              cmd_options: list | None = None,
+              units: str | int = 1,
+              get_individual_vehicle_data: bool = True,
+              include_insertion_delay: bool = False,
+              automatic_subscriptions: bool = True,
+              suppress_warnings: bool = False,
+              suppress_traci_warnings: bool = True,
+              suppress_pbar: bool = False,
+              seed: str = "random",
+              gui: bool = False,
+              sumo_home: str | None = None
+             ) -> None:
         """
         Intialises SUMO simulation.
 
@@ -126,7 +144,7 @@ class Simulation:
             `suppress_pbar` (bool): Suppress automatic progress bar when not using the GUI
             `seed` (bool): Either int to be used as seed, or `random.random()`/`random.randint()`, where a random seed is used
             `gui` (bool): Bool denoting whether to run GUI
-            `sumo_home` (str, optional):SUMO base directory, if the `$SUMO_HOME` variable is not already set within the environment
+            `sumo_home` (str, optional): SUMO base directory, if the `$SUMO_HOME` variable is not already set within the environment
         """
 
         if isinstance(sumo_home, str):
@@ -324,14 +342,14 @@ class Simulation:
                 print(f"  - TUD-SUMO version: {self._tuds_version}")
                 print(f"  - Start time: {self._sim_start_time}")
 
-    def save_objects(self, filename: str|None = None, overwrite: bool = True, json_indent: int|None = 4) -> None:
+    def save_objects(self, filename: str | None = None, *, overwrite: bool = True, json_indent: int = 4) -> None:
         """
         Save parameters of all TUD-SUMO objects created for the simulation (tracked edges/junctions, phases, controllers, events, demand, routes).
 
         Args:
-            `filename` (str, optional):Output filename ('_.json_' or '_.pkl_')
+            `filename` (str, optional): Output filename ('_.json_' or '_.pkl_')
             `overwrite` (bool): Denotes whether to allow overwriting previous outputs
-            `json_indent` (int, optional):Indent used when saving JSON files
+            `json_indent` (int, optional): Indent used when saving JSON files
         """
 
         object_params = {}
@@ -397,7 +415,7 @@ class Simulation:
             if w_mode == "wb": w_class.dump(object_params, fp)
             else: w_class.dump(object_params, fp, indent=json_indent)
 
-    def load_objects(self, object_parameters: str|dict) -> None:
+    def load_objects(self, object_parameters: str | dict) -> None:
         """
         Load parameters of all TUD-SUMO objects created for the simulation (tracked edges/junctions, phases, controllers, events, demand, routes).
         
@@ -449,7 +467,7 @@ class Simulation:
             for r_id, route in object_parameters["routes"].items():
                 self.add_route(route, r_id)
 
-    def load_demand_profiles(self, demand_profiles: str|dict|list|tuple) -> list:
+    def load_demand_profiles(self, demand_profiles: str | dict | list | tuple) -> list:
         """
         Load demand profile(s) into the simulation.
 
@@ -560,7 +578,7 @@ class Simulation:
 
                         vehicle_id = "{0}_md_{1}".format(vehicle_type, self._man_flow_id)
                         
-                        self.add_vehicle(vehicle_id, vehicle_type, routing, initial_speed, origin_lane, origin_pos)
+                        self.add_vehicle(vehicle_id, vehicle_type, routing, initial_speed=initial_speed, origin_lane=origin_lane, origin_pos=origin_pos)
 
                         vehicle_ids.append(vehicle_id)
                         added += 1
@@ -572,7 +590,26 @@ class Simulation:
             desc = "Cannot add flow manually (no demand profiles)."
             raise_warning(desc, self.curr_step)
 
-    def add_vehicle_type(self, vehicle_type_id: str, vehicle_class: str="passenger", colour: str|list|tuple|None = None, length: int|float|None = None, width: int|float|None = None, height: int|float|None = None, max_speed: int|float|None = None, speed_factor: int|float|None = None, speed_dev: int|float|None = None, min_gap: int|float|None = None, max_acceleration: int|float|None = None, max_deceleration: int|float|None = None, headway: int|float|None = None, imperfection: int|float|None = None, max_lateral_speed: int|float|None = None, emission_class: str|None = None, gui_shape: str|None = None) -> None:
+    def add_vehicle_type(self,
+                         vehicle_type_id: str,
+                         *,
+                         vehicle_class: str = "passenger",
+                         colour: str | list | tuple | None = None,
+                         length: int | float | None = None,
+                         width: int | float | None = None,
+                         height: int | float | None = None,
+                         max_speed: int | float | None = None,
+                         speed_factor: int | float | None = None,
+                         speed_dev: int | float | None = None,
+                         min_gap: int | float | None = None,
+                         max_acceleration: int | float | None = None,
+                         max_deceleration: int | float | None = None,
+                         headway: int | float | None = None,
+                         imperfection: int | float | None = None,
+                         max_lateral_speed: int | float | None = None,
+                         emission_class: str | None = None,
+                         gui_shape: str | None = None
+                        ) -> None:
         """
         Adds a new vehicle type to the simulation.
 
@@ -612,15 +649,15 @@ class Simulation:
                                    headway=headway, imperfection=imperfection, max_lateral_speed=max_lateral_speed,
                                    emission_class=emission_class, gui_shape=gui_shape)
 
-    def add_tracked_junctions(self, junctions: str|list|tuple|dict|None = None) -> dict:
+    def add_tracked_junctions(self, junctions: str | list | tuple | dict | None = None) -> dict:
         """
         Initalise junctions and start tracking states and flows. Defaults to all junctions with traffic lights.
         
         Args:
-            `junctions` (str, list, tuple, dict, optional):Junction IDs or list of IDs, or dict containing junction(s) parameters
+            `junctions` (str, list, tuple, dict, optional): Junction IDs or list of IDs, or dict containing junction(s) parameters
         
         Returns:
-            dict|TrackedJunction: Dictionary of added junctions or single TrackedJunction  object
+            dict | TrackedJunction: Dictionary of added junctions or single TrackedJunction  object
         """
 
         self.track_juncs = True
@@ -657,7 +694,7 @@ class Simulation:
         if len(added_junctions) == 1: return added_junctions[list(added_junctions.keys())[0]]
         else: return added_junctions
 
-    def reset_data(self, reset_juncs: bool = True, reset_edges: bool = True, reset_controllers: bool = True, reset_trips: bool = True) -> None:
+    def reset_data(self, *, reset_juncs: bool = True, reset_edges: bool = True, reset_controllers: bool = True, reset_trips: bool = True) -> None:
         """
         Resets object/simulation data collection.
         
@@ -723,14 +760,14 @@ class Simulation:
             pass
         self._running = False
 
-    def save_data(self, filename: str|None = None, overwrite: bool = True, json_indent: int|None = 4) -> None:
+    def save_data(self, filename: str | None = None, *, overwrite: bool = True, json_indent: int | None = 4) -> None:
         """
         Save all vehicle, detector and junction data in a JSON or pickle file.
         
         Args:
-            `filename` (str, optional):Output filepath (defaults to '_./{scenario_name}.json_')
+            `filename` (str, optional): Output filepath (defaults to '_./{scenario_name}.json_')
             `overwrite` (bool): Prevent previous outputs being overwritten
-            `json_indent` (int, optional):Indent used when saving JSON files
+            `json_indent` (int, optional): Indent used when saving JSON files
         """
 
         if filename == None:
@@ -763,12 +800,12 @@ class Simulation:
             desc = "No data to save as a simulation has not been run."
             raise_error(SimulationError, desc, self.curr_step)
 
-    def add_tracked_edges(self, edge_ids: str|list|None = None):
+    def add_tracked_edges(self, edge_ids: str | list | None = None):
         """
         Initalise edges and start collecting data.
         
         Args:
-            `edge_ids` (str, list, optional):List of edge IDs or single ID, defaults to all
+            `edge_ids` (str, list, optional): List of edge IDs or single ID, defaults to all
         """
 
         if edge_ids == None: edge_ids = self._all_edges
@@ -784,19 +821,19 @@ class Simulation:
                 raise_error(ValueError, desc, self.curr_step)
             self.tracked_edges[edge_id] = TrackedEdge(edge_id, self)
 
-    def add_events(self, event_params: Event|str|list|dict) -> None:
+    def add_events(self, event_params: Event | str | list | dict) -> None:
         """
         Add events and event scheduler.
         
         Args:
-            `event_parms` (Event, str, list, dict): Event parameters [Event|[Event]|dict|filepath]
+            `event_parms` (Event, str, list, dict): Event parameters [Event | [Event] | dict | filepath]
         """
 
         if self._scheduler == None:
             self._scheduler = EventScheduler(self)
         self._scheduler.add_events(event_params)
 
-    def add_controllers(self, controller_params: str|dict) -> dict:
+    def add_controllers(self, controller_params: str | dict) -> dict:
         """
         Add controllers from parameters in a dictionary/JSON file.
         
@@ -817,7 +854,7 @@ class Simulation:
                 self.controllers[c_id] = c_params
             elif isinstance(c_params, dict):
                 if 'type' not in c_params.keys():
-                    desc = "No type given (must be [1 (RG)|2 (VSL)])."
+                    desc = "No type given (must be [1 (RG) | 2 (VSL)])."
                     raise_error(KeyError, desc, self.curr_step)
                 if c_params['type'] in [1, 2, "VSL", "RG"]:
                     
@@ -827,26 +864,35 @@ class Simulation:
                     self.controllers[c_id] = controller
 
                 else:
-                    desc = "Invalid controller type (must be [1 (RG)|2 (VSL)])."
+                    desc = "Invalid controller type (must be [1 (RG) | 2 (VSL)])."
                     raise_error(ValueError, desc, self.curr_step)
             else:
-                desc = "Invalid parameters type in dictionary (must be [dict|RGController|VSLController], not '{0}').".format(type(c_params).__name__)
+                desc = "Invalid parameters type in dictionary (must be [dict | RGController | VSLController], not '{0}').".format(type(c_params).__name__)
                 raise_error(TypeError, desc, self.curr_step)
 
         return self.controllers
 
-    def step_through(self, n_steps: int|None = None, end_step: int|None = None, n_seconds: int|None = None, vehicle_types: list|tuple|None = None, keep_data: bool = True, append_data: bool = True, pbar_max_steps: int|None = None) -> dict:
+    def step_through(self,
+                     n_steps: int | None = None,
+                     *,
+                     end_step: int | None = None,
+                     n_seconds: int | None = None,
+                     vehicle_types: list | tuple | None = None,
+                     keep_data: bool = True,
+                     append_data: bool = True,
+                     pbar_max_steps: int | None = None
+                    ) -> dict:
         """
         Step through simulation from the current time until end_step, aggregating data during this period.
         
         Args:
-            `n_steps` (int, optional):Perform n steps of the simulation (defaults to 1)
-            `end_step` (int, optional):End point for stepping through simulation (given instead of `n_steps` or `n_seconds`)
-            `n_seconds` (int, optional):Simulation duration in seconds (given instead of `n_steps` or `end_step`)
-            `vehicle_types` (list, tuple, optional):Vehicle type(s) to collect data of (type ID or list of IDs, defaults to all)
+            `n_steps` (int, optional): Perform n steps of the simulation (defaults to 1)
+            `end_step` (int, optional): End point for stepping through simulation (given instead of `n_steps` or `n_seconds`)
+            `n_seconds` (int, optional): Simulation duration in seconds (given instead of `n_steps` or `end_step`)
+            `vehicle_types` (list, tuple, optional): Vehicle type(s) to collect data of (type ID or list of IDs, defaults to all)
             `keep_data` (bool): Denotes whether to store and process data collected during this run (defaults to `True`)
             `append_data` (bool): Denotes whether to append simulation data to that of previous runs or overwrite previous data (defaults to `True`)
-            `pbar_max_steps` (int, optional):Max value for progress bar (persistent across calls) (negative values remove the progress bar)
+            `pbar_max_steps` (int, optional): Max value for progress bar (persistent across calls) (negative values remove the progress bar)
         
         Returns:
             dict: All data collected through the time period, separated by detector
@@ -932,7 +978,7 @@ class Simulation:
 
         while self.curr_step < end_step:
 
-            last_step_data, all_v_data = self._step(vehicle_types, keep_data)
+            last_step_data, all_v_data = self._step(vehicle_types=vehicle_types, keep_data=keep_data)
 
             if keep_data:
                 if self._get_individual_vehicle_data: all_data["data"]["all_vehicles"].append(all_v_data)
@@ -981,12 +1027,12 @@ class Simulation:
         
         else: return None
             
-    def _step(self, vehicle_types: list|None = None, keep_data: bool = True) -> dict:
+    def _step(self, *, vehicle_types: list | None = None, keep_data: bool = True) -> dict:
         """
         Increment simulation by one time step, updating light state. Use `Simulation.step_through()` to run the simulation.
         
         Args:
-            `vehicle_types` (list, optional):Vehicle type(s) to collect data of (type ID or list of IDs, defaults to all)
+            `vehicle_types` (list, optional): Vehicle type(s) to collect data of (type ID or list of IDs, defaults to all)
             `keep_data` (bool): Denotes whether to store and process data collected during this run (defaults to `True`)
 
         Returns:
@@ -1192,7 +1238,7 @@ class Simulation:
             raise_error(SimulationError, desc, self.curr_step)
         return self._all_data["data"]["vehicles"]["to_depart"][-1]
     
-    def get_interval_network_data(self, data_keys: list|tuple, n_steps: int, interval_end: int = 0, get_avg: bool=False) -> float|dict:
+    def get_interval_network_data(self, data_keys: list | tuple, n_steps: int, *, interval_end: int = 0, get_avg: bool=False) -> float | dict:
         """
         Returns network-wide vehicle data in the simulation during range (`curr step - n_step - interval_end -> curr_step - interval_end`).
         Valid data keys are; '_tts_', '_twt_', '_delay_', '_no_vehicles_', '_no_waiting_' and '_to_depart_'. By default, all values are
@@ -1305,7 +1351,7 @@ class Simulation:
         if v_func_type.upper() == "IN": self._v_in_funcs = new_v_funcs
         elif v_func_type.upper() == "OUT": self._v_out_funcs = new_v_funcs
     
-    def add_vehicle_in_functions(self, functions, parameters: dict|None = None) -> None:
+    def add_vehicle_in_functions(self, functions, parameters: dict | None = None) -> None:
         """
         Add a function (or list of functions) that will are called with each new vehicle that enters the simulation.
         Valid TUD-SUMO parameters are '_simulation_', '_curr_step_', '_vehicle_id_', '_route_id_', '_vehicle_type_',
@@ -1329,7 +1375,7 @@ class Simulation:
         
         self._remove_v_func(functions, "in")
 
-    def add_vehicle_out_functions(self, functions, parameters: dict|None = None) -> None:
+    def add_vehicle_out_functions(self, functions, parameters: dict | None = None) -> None:
         """
         Add a function (or list of functions) that will are called with each vehicle that exits the simulation.
         Valid TUD-SUMO parameters are '_simulation_', '_curr_step_' and '_vehicle_id_'. These values are collected
@@ -1337,7 +1383,7 @@ class Simulation:
         
         Args:
             `functions` (function, list): Function or list of functions
-            `parameters` (dict, optional):Dictionary containing values for extra custom parameters
+            `parameters` (dict, optional): Dictionary containing values for extra custom parameters
         """
 
         self._add_v_func(functions, parameters, self._v_out_funcs, self._valid_v_func_params[:3])
@@ -1376,7 +1422,7 @@ class Simulation:
                 desc = "Vehicle function '{0}' not found.".format(func_name)
                 raise_error(KeyError, desc, self.curr_step)
 
-    def _vehicles_in(self, vehicle_ids: str|list|tuple, is_added: bool = False) -> None:
+    def _vehicles_in(self, vehicle_ids: str | list | tuple, is_added: bool = False) -> None:
         """
         Updates simulation with each new vehicle.
 
@@ -1415,7 +1461,7 @@ class Simulation:
                     else: param_dict[param] = val
                 func(**param_dict)
             
-    def _vehicles_out(self, vehicle_ids: str|list|tuple, is_removed: bool = False) -> None:
+    def _vehicles_out(self, vehicle_ids: str | list | tuple, is_removed: bool = False) -> None:
         """
         Updates simulation with each leaving vehicle.
 
@@ -1473,13 +1519,13 @@ class Simulation:
                     else: param_dict[param] = val
                 func(**param_dict)
                 
-    def get_last_step_detector_vehicles(self, detector_ids: str|list|tuple, vehicle_types: list|None = None, flatten: bool = False) -> dict|list:
+    def get_last_step_detector_vehicles(self, detector_ids: str | list | tuple, *, vehicle_types: list | None = None, flatten: bool = False) -> dict | list:
         """
         Get the IDs of vehicles that passed over the specified detectors.
         
         Args:
             `detector_ids` (str, list, tuple): Detector ID or list of IDs (defaults to all)
-            `vehicle_types` (list, optional):Included vehicle types
+            `vehicle_types` (list, optional): Included vehicle types
             `flatten` (bool): If true, all IDs are returned in a 1D array, else a dict with vehicles for each detector
         
         Returns:
@@ -1509,7 +1555,7 @@ class Simulation:
 
         return vehicle_ids
     
-    def get_detector_vals(self, detector_ids: list|tuple|str, data_keys: str|list) -> int|float|dict:
+    def get_detector_vals(self, detector_ids: list | tuple | str, data_keys: str | list) -> int | float | dict:
         """
         Get data values from a specific detector (_Multi-Entry-Exit (MEE)_ or _Induction Loop (IL)_) using a list
         of data keys. Valid data keys are; '_type_', '_position_', '_vehicle_count_', '_vehicle_ids_', '_lsm_speed_',
@@ -1614,7 +1660,16 @@ class Simulation:
         
         return all_data_vals
     
-    def get_interval_detector_data(self, detector_ids: str|list|tuple, data_keys: str|list, n_steps: int, interval_end: int = 0, avg_step_vals: bool = True, avg_det_vals: bool = True, sum_counts: bool = True) -> float|list|dict:
+    def get_interval_detector_data(self,
+                                   detector_ids: str | list | tuple,
+                                   data_keys: str | list,
+                                   n_steps: int,
+                                   *, 
+                                   interval_end: int = 0,
+                                   avg_step_vals: bool = True,
+                                   avg_det_vals: bool = True,
+                                   sum_counts: bool = True
+                                  ) -> float | list | dict:
         """
         Get data previously collected by a detector over range (`curr step - n_step - interval_end -> curr_step - interval_end`).
         Valid data keys are; '_flow_', '_density_', '_speeds_', '_no_vehicles_', '_no_unique_vehicles_', '_occupancies_' (induction loop only).
@@ -1734,7 +1789,7 @@ class Simulation:
                     elif avg_step_vals: all_data_vals[data_key][idx] = sum(vals) / len(vals) if len(vals) > 0 else -1
 
             # if averaging detector values (return average for all detectors), flatten
-            # the matrix on the y axis, from ([n_steps|1] x len(detector_ids)) to ([n_steps|1] x 1)
+            # the matrix on the y axis, from ([n_steps | 1] x len(detector_ids)) to ([n_steps | 1] x 1)
             if avg_det_vals and data_key not in ["flow", "density"]:
                 
                 if avg_step_vals:
@@ -1760,7 +1815,7 @@ class Simulation:
         if len(all_data_vals) == 1: return all_data_vals[data_keys[0]]
         else: return all_data_vals
 
-    def set_phases(self, junction_phases: dict, start_phase: int = 0, overwrite: bool = True) -> None:
+    def set_phases(self, junction_phases: dict, *, start_phase: int = 0, overwrite: bool = True) -> None:
         """
         Sets the phases for the simulation, starting at the next simulation step.
         
@@ -1812,7 +1867,7 @@ class Simulation:
 
         self._update_lights(list(junction_phases.keys()))
 
-    def set_m_phases(self, junction_phases: dict, start_phase: int = 0, overwrite: bool = True) -> None:
+    def set_m_phases(self, junction_phases: dict, *, start_phase: int = 0, overwrite: bool = True) -> None:
         """
         Sets the traffic light phases for the simulation based on movements, starting at the next simulation step.
         
@@ -1873,7 +1928,7 @@ class Simulation:
                     invalid_colours = list(set(colours) - valid_colours)
                     if len(invalid_colours) > 0:
                         invalid_colours.sort()
-                        desc = "Invalid phase colour(s) in junction '{0}', movement '{1}' (['{2}'] are invalid, must be in ['{3}']).".format(junction_id, m_key, "','".join(invalid_colours), "'|'".join(list(valid_colours)))
+                        desc = "Invalid phase colour(s) in junction '{0}', movement '{1}' (['{2}'] are invalid, must be in ['{3}']).".format(junction_id, m_key, "','".join(invalid_colours), "' | '".join(list(valid_colours)))
                         raise_error(ValueError, desc, self.curr_step)
 
                 complete, new_junc_phases = False, {"phases": [], "times": []}
@@ -1910,15 +1965,15 @@ class Simulation:
                 desc = "Invalid phases for junction '{0}' (movement keys do not match).".format(junction_id)
                 raise_error(KeyError, desc, self.curr_step)
 
-        self.set_phases(new_phase_dict, start_phase, overwrite)
+        self.set_phases(new_phase_dict, start_phase=start_phase, overwrite=overwrite)
 
-    def set_tl_colour(self, junction_id: str|int, colour_str: str) -> None:
+    def set_tl_colour(self, junction_id: str | int, colour_str: str) -> None:
         """
         Sets a junction to a colour for an indefinite amount of time. Can be used when tracking phases separately (ie. not within TUD-SUMO).
         
         Args:
             `junction_id` (str, int): Junction ID
-            `colour_str` (str): Phase colour string (valid characters are ['_G_'|'_g_'|'_y_'|'_r_'|'-'])
+            `colour_str` (str): Phase colour string (valid characters are ['_G_' | '_g_' | '_y_' | '_r_' | '-'])
         """
         
         if junction_id not in list(traci.trafficlight.getIDList()):
@@ -1943,7 +1998,16 @@ class Simulation:
         
         self.set_phases(junc_phases, overwrite=False)
 
-    def set_tl_metering_rate(self, rm_id: str, metering_rate: int|float, g_time: int|float = 1, y_time: int|float = 1, min_red: int|float = 1, vehs_per_cycle: int|None = None, control_interval: int|float = 60) -> dict:
+    def set_tl_metering_rate(self,
+                             rm_id: str,
+                             metering_rate: int | float,
+                             *,
+                             g_time: int | float = 1,
+                             y_time: int | float = 1,
+                             min_red: int | float = 1,
+                             vehs_per_cycle: int | None = None,
+                             control_interval: int | float = 60
+                            ) -> dict:
         """
         Set ramp metering rate of a meter at a junction. Uses a one-car-per-green policy with a default
         1s green and yellow time, with red phase duration changed to set flow. All phase durations must
@@ -1955,7 +2019,7 @@ class Simulation:
             `g_time` (int, float): Green phase duration (s), defaults to 1
             `y_time` (int, float): Yellow phase duration (s), defaults to 1
             `min_red` (int, float): Minimum red phase duration (s), defaults to 1
-            `vehs_per_cycle` (int, optional):Number of vehicles released with each cycle, defaults to the number of lanes
+            `vehs_per_cycle` (int, optional): Number of vehicles released with each cycle, defaults to the number of lanes
             `control_interval` (int, float): Ramp meter control interval (s)
         
         Returns:
@@ -2020,7 +2084,7 @@ class Simulation:
         self.set_phases({rm_id: phases_dict}, overwrite=False)
         return phases_dict
 
-    def change_phase(self, junction_id: str|int, phase_number: int) -> None:
+    def change_phase(self, junction_id: str | int, phase_number: int) -> None:
         """
         Change to a different phase at the specified junction_id.
         
@@ -2039,12 +2103,12 @@ class Simulation:
             desc = "Invalid phase number '{0}' (must be [0-{1}]).".format(phase_number, len(self._junc_phases[junction_id]["phases"]))
             raise_error(ValueError, desc, self.curr_step)
 
-    def _update_lights(self, junction_ids: list|str|None = None) -> None:
+    def _update_lights(self, junction_ids: list | str | None = None) -> None:
         """
         Update light settings for given junctions.
         
         Args:
-            `junction_ids` (list, str, optional):Junction ID, or list of IDs (defaults to all)
+            `junction_ids` (list, str, optional): Junction ID, or list of IDs (defaults to all)
         """
 
         if junction_ids is None: junction_ids = self._junc_phases.keys()
@@ -2059,7 +2123,14 @@ class Simulation:
                 new_phase = "".join([new_phase[i] if new_phase[i] != '-' else curr_setting[i] for i in range(len(new_phase))])
             traci.trafficlight.setRedYellowGreenState(junction_id, new_phase)
 
-    def add_vehicle(self, vehicle_id: str, vehicle_type: str, routing: str|list|tuple, initial_speed: str|int|float="max", origin_lane: str|int="best", origin_pos: str|int|float = "base") -> None:
+    def add_vehicle(self,
+                    vehicle_id: str,
+                    vehicle_type: str,
+                    routing: str | list | tuple,
+                    *,
+                    initial_speed: str | int | float = "max",
+                    origin_lane: str | int = "best",
+                    origin_pos: str | int | float = "base") -> None:
         """
         Add a new vehicle into the simulation.
         
@@ -2067,9 +2138,9 @@ class Simulation:
             `vehicle_id` (str): ID for new vehicle, **must be unique**
             `vehicle_type` (str): Vehicle type ID for new vehicle
             `routing` (str, list, tuple): Either route ID or (2x1) list of edge IDs for origin-destination pair
-            `initial_speed` (str, int, float): Initial speed at insertion, either ['_max_'|'_random_'] or number > 0
-            `origin_lane` (str, int, float): Lane for insertion at origin, either ['_random_'|'_free_'|'_allowed_'|'_best_'|'_first_'] or lane index
-            `origin_pos` (str, int): Longitudinal position at insertion, either ['_random_'|'_free_'|'_random_free_'|'_base_'|'_last_'|'_stop_'|'_splitFront_'] or offset
+            `initial_speed` (str, int, float): Initial speed at insertion, either ['_max_' | '_random_'] or number > 0
+            `origin_lane` (str, int, float): Lane for insertion at origin, either ['_random_' | '_free_' | '_allowed_' | '_best_' | '_first_'] or lane index
+            `origin_pos` (str, int): Longitudinal position at insertion, either ['_random_' | '_free_' | '_random_free_' | '_base_' | '_last_' | '_stop_' | '_splitFront_'] or offset
         """
 
         if self.vehicle_exists(vehicle_id):
@@ -2079,7 +2150,7 @@ class Simulation:
         origin_lane = validate_type(origin_lane, (str, int), "origin_lane", self.curr_step)
         initial_speed = validate_type(initial_speed, (str, int, float), "initial_speed", self.curr_step)
         if isinstance(initial_speed, str) and initial_speed not in ["max", "random"]:
-            desc = "Invalid initial_speed string given '{0}' (must be ['_max_'|'_random_']).".format(initial_speed, type(initial_speed).__name__)
+            desc = "Invalid initial_speed string given '{0}' (must be ['_max_' | '_random_']).".format(initial_speed, type(initial_speed).__name__)
             raise_error(TypeError, desc, self.curr_step)
         elif isinstance(initial_speed, (int, float)) and initial_speed < 0:
             desc = "Invalid initial_speed value given '{0}' (must be > 0).".format(initial_speed, type(initial_speed).__name__)
@@ -2136,7 +2207,7 @@ class Simulation:
                 desc = "Invalid routing given '[{0}]' (must have shape (2x1)).".format(",".join(routing))
                 raise_error(TypeError, desc, self.curr_step)
     
-    def remove_vehicles(self, vehicle_ids: str|list|tuple) -> None:
+    def remove_vehicles(self, vehicle_ids: str | list | tuple) -> None:
         """
         Remove a vehicle or list of vehicles from the simulation.
         
@@ -2155,7 +2226,18 @@ class Simulation:
                 desc = "Unrecognised vehicle ID given ('{0}').".format(vehicle_id)
                 raise_error(KeyError, desc, self.curr_step)
 
-    def cause_incident(self, duration: int, vehicle_ids: str|list|tuple|None=None, geometry_ids: str|list|tuple=None, n_vehicles: int=1, vehicle_separation: float=0, assert_n_vehicles: bool=False, edge_speed: int|float|None=-1, highlight_vehicles: bool=True, incident_id: str|None=None) -> bool:
+    def cause_incident(self,
+                       duration: int,
+                       *,
+                       vehicle_ids: str | list | tuple | None = None,
+                       geometry_ids: str | list | tuple = None,
+                       n_vehicles: int = 1,
+                       vehicle_separation: float = 0,
+                       assert_n_vehicles: bool = False,
+                       edge_speed: int | float | None = -1,
+                       highlight_vehicles: bool = True,
+                       incident_id: str | None = None
+                      ) -> bool:
         """
         Simulates an incident by stopping vehicles on the road for a period of time, before removing
         them from the simulation. Vehicle(s) can either be specified using `vehicle_ids`, chosen
@@ -2164,14 +2246,14 @@ class Simulation:
         
         Args:
             `duration` (int): Duration of incident (in seconds)
-            `vehicle_ids` (str, list, tuple, optional):Vehicle ID or list of IDs to include in the incident
-            `geometry_ids` (str, list, tuple, optional):Geometry ID or list of IDs to randomly select vehicles from
+            `vehicle_ids` (str, list, tuple, optional): Vehicle ID or list of IDs to include in the incident
+            `geometry_ids` (str, list, tuple, optional): Geometry ID or list of IDs to randomly select vehicles from
             `n_vehicles` (int): Number of vehicles in the incident, if randomly chosen
             `vehicle_separation` (float): Factor denoting how separated randomly chosen vehicles are (0.1-1)
             `assert_n_vehicles` (bool): Denotes whether to throw an error if the correct number of vehicles cannot be found
             `edge_speed` (int, float, None, optional): New max speed for edges where incident vehicles are located (defaults to 15km/h or 10mph). Set to `None` to not change speed.
             `highlight_vehicles` (bool): Denotes whether to highlight vehicles in the SUMO GUI
-            `incident_id` (str, optional):Incident event ID used in the simulation data file (defaults to '_incident_{n}_')
+            `incident_id` (str, optional): Incident event ID used in the simulation data file (defaults to '_incident_{n}_')
 
         Returns:
             bool: Denotes whether incident was successfully created
@@ -2282,7 +2364,17 @@ class Simulation:
         self.add_events({incident_id: event_dict})
         return True
     
-    def add_weather(self, duration: int|float, strength: float = 0.2, locations: list|tuple|None = None, *, weather_id: str|None = None, headway_increase: int|float|None = None, imperfection_increase: int|float|None = None, acceleration_reduction: int|float|None = None, speed_f_reduction: float|int|None = None) -> str:
+    def add_weather(self,
+                    duration: int | float,
+                    strength: float = 0.2,
+                    locations: list | tuple | None = None,
+                    *,
+                    weather_id: str | None = None,
+                    headway_increase: int | float | None = None,
+                    imperfection_increase: int | float | None = None,
+                    acceleration_reduction: int | float | None = None,
+                    speed_f_reduction: float | int | None = None
+                   ) -> str:
         """
         Starts simulating weather effects in the next time step. Both desired time headway and driver imperfection
         are increased, whilst acceleration/deceleration and driver speed factor are reduced. The increase/reduction
@@ -2435,7 +2527,7 @@ class Simulation:
         
         return vehicle_id in self._all_to_depart_vehicle_ids
     
-    def add_vehicle_subscriptions(self, vehicle_ids: str|list|tuple, data_keys: str|list|tuple) -> None:
+    def add_vehicle_subscriptions(self, vehicle_ids: str | list | tuple, data_keys: str | list | tuple) -> None:
         """
         Creates a new subscription for certain variables for **specific vehicles**. Valid data keys are;
         '_speed_', '_is_stopped_', '_max_speed_', '_acceleration_', '_position_', '_altitude_', '_heading_',
@@ -2471,7 +2563,7 @@ class Simulation:
                 desc = "Unrecognised vehicle ID given ('{0}').".format(vehicle_id)
                 raise_error(KeyError, desc, self.curr_step)
 
-    def remove_vehicle_subscriptions(self, vehicle_ids: str|list|tuple) -> None:
+    def remove_vehicle_subscriptions(self, vehicle_ids: str | list | tuple) -> None:
         """
         Remove **all** active subscriptions for a vehicle or list of vehicles.
         
@@ -2489,7 +2581,7 @@ class Simulation:
                 desc = "Unrecognised vehicle ID given ('{0}').".format(vehicle_id)
                 raise_error(KeyError, desc, self.curr_step)
     
-    def add_detector_subscriptions(self, detector_ids: str|list|tuple, data_keys: str|list|tuple) -> None:
+    def add_detector_subscriptions(self, detector_ids: str | list | tuple, data_keys: str | list | tuple) -> None:
         """
         Creates a new subscription for certain variables for **specific detectors**. Valid data keys are;
         '_vehicle_count_', '_vehicle_ids_', '_speed_', '_halting_no_', '_occupancy_', '_last_detection_'.
@@ -2527,7 +2619,7 @@ class Simulation:
             subscription_vars = [traci_constants["detector"][data_key] for data_key in data_keys]
             d_class.subscribe(detector_id, subscription_vars)
 
-    def remove_detector_subscriptions(self, detector_ids: str|list|tuple) -> None:
+    def remove_detector_subscriptions(self, detector_ids: str | list | tuple) -> None:
         """
         Remove **all** active subscriptions for a detector or list of detectors.
         
@@ -2554,7 +2646,7 @@ class Simulation:
 
                 d_class.unsubscribe(detector_id)
     
-    def add_geometry_subscriptions(self, geometry_ids: str|list|tuple, data_keys: str|list|tuple) -> None:
+    def add_geometry_subscriptions(self, geometry_ids: str | list | tuple, data_keys: str | list | tuple) -> None:
         """
         Creates a new subscription for geometry (edge/lane) variables. Valid data keys are;
         '_vehicle_count_', '_vehicle_ids_', '_vehicle_speed_', '_halting_no_', '_occupancy_'.
@@ -2586,7 +2678,7 @@ class Simulation:
             subscription_vars = [traci_constants["geometry"][data_key] for data_key in data_keys]
             g_class.subscribe(geometry_id, subscription_vars)
 
-    def remove_geometry_subscriptions(self, geometry_ids: str|list|tuple) -> None:
+    def remove_geometry_subscriptions(self, geometry_ids: str | list | tuple) -> None:
         """
         Remove **all** active subscriptions for a geometry object or list of geometry objects.
         
@@ -2607,7 +2699,7 @@ class Simulation:
 
             g_class.unsubscribe(geometry_id)
     
-    def set_vehicle_vals(self, vehicle_ids: list|tuple|str, **kwargs) -> None:
+    def set_vehicle_vals(self, vehicle_ids: list | tuple | str, **kwargs) -> None:
         """
         Changes vehicle characteristics.
         
@@ -2677,14 +2769,14 @@ class Simulation:
                         if isinstance(value, (int, float)): 
                             traci.vehicle.setSpeed(vehicle_id, convert_units(value, self._speed_unit, "m/s"))
                         else:
-                            desc = "({0}): Invalid speed value '{1}' (must be [int|float], not '{2}').".format(command, value, type(value).__name__)
+                            desc = "({0}): Invalid speed value '{1}' (must be [int | float], not '{2}').".format(command, value, type(value).__name__)
                             raise_error(TypeError, desc, self.curr_step)
                     
                     case "max_speed":
                         if isinstance(value, (int, float)):
                             traci.vehicle.setMaxSpeed(vehicle_id, convert_units(value, self._speed_unit, "m/s"))
                         else:
-                            desc = "({0}): Invalid max_speed value '{1}' (must be [int|float], not '{2}').".format(command, value, type(value).__name__)
+                            desc = "({0}): Invalid max_speed value '{1}' (must be [int | float], not '{2}').".format(command, value, type(value).__name__)
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "speed_factor":
@@ -2694,7 +2786,7 @@ class Simulation:
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicle.setSpeedFactor(vehicle_id, value)
                         else:
-                            desc = f"({command}): Invalid speed factor value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid speed factor value '{value}' (must be [int | float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "headway":
@@ -2704,7 +2796,7 @@ class Simulation:
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicle.setTau(vehicle_id, value)
                         else:
-                            desc = f"({command}): Invalid headway value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid headway value '{value}' (must be [int | float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "imperfection":
@@ -2714,20 +2806,20 @@ class Simulation:
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicle.setImperfection(vehicle_id, value)
                         else:
-                            desc = f"({command}): Invalid imperfection value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid imperfection value '{value}' (must be [int | float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "acceleration":
                         if isinstance(value, (list, tuple)) and len(value) == 2:
                             if not isinstance(value[0], (int, float)):
-                                desc = "({0}): Invalid acceleration '{1}' (must be [int|float], not '{2}').".format(command, value[0], type(value[0]).__name__)
+                                desc = "({0}): Invalid acceleration '{1}' (must be [int | float], not '{2}').".format(command, value[0], type(value[0]).__name__)
                                 raise_error(TypeError, desc, self.curr_step)
                             if not isinstance(value[1], (int, float)):
-                                desc = "({0}): Invalid duration '{1}' (must be [int|float], not '{2}').".format(command, value[1], type(value[1]).__name__)
+                                desc = "({0}): Invalid duration '{1}' (must be [int | float], not '{2}').".format(command, value[1], type(value[1]).__name__)
                                 raise_error(TypeError, desc, self.curr_step)
                             traci.vehicle.setAcceleration(vehicle_id, float(value[0]), float(value[1]))
                         else:
-                            desc = "({0}): '{0}' requires 2 parameters (acceleration [int|float], duration [int|float])".format(command)
+                            desc = "({0}): '{0}' requires 2 parameters (acceleration [int | float], duration [int | float])".format(command)
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "max_acceleration":
@@ -2737,7 +2829,7 @@ class Simulation:
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicle.setAccel(vehicle_id, value)
                         else:
-                            desc = f"({command}): Invalid max_acceleration value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid max_acceleration value '{value}' (must be [int | float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "max_deceleration":
@@ -2747,7 +2839,7 @@ class Simulation:
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicle.setDecel(vehicle_id, value)
                         else:
-                            desc = f"({command}): Invalid max_deceleration value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid max_deceleration value '{value}' (must be [int | float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "lane_idx":
@@ -2756,11 +2848,11 @@ class Simulation:
                                 desc = "({0}): Invalid lane_idx '{1}' (must be int, not '{2}').".format(command, value[0], type(value[0]).__name__)
                                 raise_error(TypeError, desc, self.curr_step)
                             if not isinstance(value[1], (int, float)):
-                                desc = "({0}): Invalid duration '{1}' (must be [int|float], not '{2}').".format(command, value[1], type(value[1]).__name__)
+                                desc = "({0}): Invalid duration '{1}' (must be [int | float], not '{2}').".format(command, value[1], type(value[1]).__name__)
                                 raise_error(TypeError, desc, self.curr_step)
                             traci.vehicle.changeLane(vehicle_id, value[0], float(value[1]))
                         else:
-                            desc = "({0}): '{0}' requires 2 parameters (lane_idx [int], duration [int|float])".format(command)
+                            desc = "({0}): '{0}' requires 2 parameters (lane_idx [int], duration [int | float])".format(command)
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "destination":
@@ -2824,7 +2916,7 @@ class Simulation:
                             desc = f"({command}: Invalid stop value '{value}' (must be bool, not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
-    def set_vehicle_type_vals(self, vehicle_types: list|tuple|str, **kwargs) -> None:
+    def set_vehicle_type_vals(self, vehicle_types: list | tuple | str, **kwargs) -> None:
         """
         Changes vehicle type characteristics.
         
@@ -2880,7 +2972,7 @@ class Simulation:
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicletype.setLength(vehicle_type, convert_units(value, self._s_dist_unit, "metres"))
                         else:
-                            desc = f"({command}): Invalid length value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid length value '{value}' (must be [int | float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "width":
@@ -2890,7 +2982,7 @@ class Simulation:
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicletype.setWidth(vehicle_type, convert_units(value, self._s_dist_unit, "metres"))
                         else:
-                            desc = f"({command}): Invalid width value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid width value '{value}' (must be [int | float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "height":
@@ -2900,7 +2992,7 @@ class Simulation:
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicletype.setHeight(vehicle_type, convert_units(value, self._s_dist_unit, "metres"))
                         else:
-                            desc = f"({command}): Invalid height value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid height value '{value}' (must be [int | float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "mass":
@@ -2910,7 +3002,7 @@ class Simulation:
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicletype.setMass(vehicle_type, convert_units(value, self._weight_unit, "kilograms"))
                         else:
-                            desc = f"({command}): Invalid mass value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid mass value '{value}' (must be [int | float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "max_speed":
@@ -2920,7 +3012,7 @@ class Simulation:
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicletype.setMaxSpeed(vehicle_type, convert_units(value, self._speed_unit, "m/s"))
                         else:
-                            desc = f"({command}): Invalid max_speed value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid max_speed value '{value}' (must be [int | float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "speed_factor":
@@ -2930,7 +3022,7 @@ class Simulation:
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicletype.setSpeedFactor(vehicle_type, value)
                         else:
-                            desc = f"({command}): Invalid speed_factor value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid speed_factor value '{value}' (must be [int | float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "speed_dev":
@@ -2940,7 +3032,7 @@ class Simulation:
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicletype.setSpeedDeviation(vehicle_type, value)
                         else:
-                            desc = f"({command}): Invalid speed_dev value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid speed_dev value '{value}' (must be [int | float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "max_acceleration":
@@ -2950,7 +3042,7 @@ class Simulation:
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicletype.setAccel(vehicle_type, value)
                         else:
-                            desc = f"({command}): Invalid max_acceleration value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid max_acceleration value '{value}' (must be [int | float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "max_deceleration":
@@ -2960,7 +3052,7 @@ class Simulation:
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicletype.setDecel(vehicle_type, value)
                         else:
-                            desc = f"({command}): Invalid max_deceleration value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid max_deceleration value '{value}' (must be [int | float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "headway":
@@ -2970,7 +3062,7 @@ class Simulation:
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicletype.setTau(vehicle_type, value)
                         else:
-                            desc = f"({command}): Invalid headway value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid headway value '{value}' (must be [int | float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "imperfection":
@@ -2980,7 +3072,7 @@ class Simulation:
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicletype.setImperfection(vehicle_type, value)
                         else:
-                            desc = f"({command}): Invalid imperfection value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid imperfection value '{value}' (must be [int | float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "max_lateral_speed":
@@ -2990,7 +3082,7 @@ class Simulation:
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicletype.setMaxSpeedLat(vehicle_type, value)
                         else:
-                            desc = f"({command}): Invalid max_lateral_speed value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid max_lateral_speed value '{value}' (must be [int | float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "emission_class":
@@ -3007,7 +3099,7 @@ class Simulation:
                             desc = f"({command}): Invalid gui_shape value '{value}' (must be 'str', not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
-    def get_vehicle_type_vals(self, vehicle_types: str|list|tuple, data_keys: str|list) -> dict|str|float|tuple:
+    def get_vehicle_type_vals(self, vehicle_types: str | list | tuple, data_keys: str | list) -> dict | str | float | tuple:
         """
         Get data values for specific vehicle type(s) using a list of data keys. Valid data keys are;
         '_vehicle_class_', '_colour_', '_length_', '_width_', '_height_', '_headway_', '_imperfection_', '_mass_',
@@ -3038,7 +3130,7 @@ class Simulation:
             elif isinstance(data_keys, (list, tuple)):
                 return_val = len(data_keys) == 1
             else:
-                desc = "Invalid data_keys given '{0}' (must be [str|(str)], not '{1}').".format(data_keys, type(data_keys).__name__)
+                desc = "Invalid data_keys given '{0}' (must be [str | (str)], not '{1}').".format(data_keys, type(data_keys).__name__)
                 raise_error(TypeError, desc, self.curr_step)
             
             data_vals = {}
@@ -3112,12 +3204,12 @@ class Simulation:
 
         return all_data_vals
 
-    def get_vehicle_ids(self, vehicle_types: str|list|tuple|None = None) -> list:
+    def get_vehicle_ids(self, vehicle_types: str | list | tuple | None = None) -> list:
         """
         Return list of IDs for all vehicles currently in the simulation.
         
         Args:
-            `vehicle_types` (str, list, tuple, optional):Vehicle type ID or list of IDs (defaults to all)
+            `vehicle_types` (str, list, tuple, optional): Vehicle type ID or list of IDs (defaults to all)
 
         Returns:
             list: All current vehicle IDs
@@ -3180,12 +3272,12 @@ class Simulation:
 
         return list(self._vehicle_types) + list(self._added_vehicle_types)
     
-    def get_geometry_ids(self, geometry_types: str|list|tuple|None = None) -> list:
+    def get_geometry_ids(self, geometry_types: str | list | tuple | None = None) -> list:
         """
         Return list of IDs for all edges and lanes in the network.
         
         Args:
-            `geometry_types` (str, list, tuple, optional):Geometry type ['_edge_'|'_lane_'] or list of types
+            `geometry_types` (str, list, tuple, optional): Geometry type ['_edge_' | '_lane_'] or list of types
         
         Returns:
             list: All geometry types (of type)
@@ -3210,12 +3302,12 @@ class Simulation:
         
         return geometry_ids
 
-    def get_detector_ids(self, detector_types: str|list|tuple|None = None) -> list:
+    def get_detector_ids(self, detector_types: str | list | tuple | None = None) -> list:
         """
         Return list of IDs for all edges and lanes in the network.
         
         Args:
-            `detector_types` (str, list, tuple, optional):Detector type ['_multientryexit_'|'_inductionloop_'] or list of types
+            `detector_types` (str, list, tuple, optional): Detector type ['_multientryexit_' | '_inductionloop_'] or list of types
         
         Returns:
             list: All detector IDs (of type)
@@ -3237,7 +3329,7 @@ class Simulation:
         
         return detector_ids
     
-    def get_path_edges(self, origin: str, destination: str, curr_optimal: bool = True) -> list|None:
+    def get_path_edges(self, origin: str, destination: str, *, curr_optimal: bool = True) -> list | None:
         """
         Find an optimal route between 2 edges (using the A* algorithm).
         
@@ -3289,7 +3381,7 @@ class Simulation:
                 optimal_path.append(origin)
                 optimal_path.reverse()
 
-                return optimal_path, self.get_path_travel_time(optimal_path, curr_optimal)
+                return optimal_path, self.get_path_travel_time(optimal_path, curr_tt=curr_optimal)
  
             outgoing_edges = self.get_geometry_vals(curr_edge, "outgoing_edges")
             for connected_edge in outgoing_edges:
@@ -3313,14 +3405,14 @@ class Simulation:
  
         return None
     
-    def get_path_travel_time(self, edge_ids: list|tuple, curr_tt: bool = True, unit: str = "seconds") -> float:
+    def get_path_travel_time(self, edge_ids: list | tuple, *, curr_tt: bool = True, unit: str = "seconds") -> float:
         """
         Calculates the travel time for a route.
         
         Args:
             `edge_ids` (list, tuple): List of edge IDs
             `curr_tt` (bool): Denotes whether to find the current travel time (ie. whether to consider current conditions)
-            `unit` (str): Time unit (either ['_steps_'|'_seconds_'|'_minutes_'|'_hours_']) (defaults to seconds)
+            `unit` (str): Time unit (either ['_steps_' | '_seconds_' | '_minutes_' | '_hours_']) (defaults to seconds)
         
         Returns:
             float: Travel time in specified unit
@@ -3333,7 +3425,7 @@ class Simulation:
 
         return convert_units(total_tt, "hours", unit, self.step_length)
     
-    def is_valid_path(self, edge_ids: list|tuple) -> bool:
+    def is_valid_path(self, edge_ids: list | tuple) -> bool:
         """
         Checks whether a list of edges is a valid connected path. If two disconnected
         edges are given, it returns whether there is a path between them.
@@ -3370,14 +3462,14 @@ class Simulation:
 
         return True
     
-    def add_route(self, routing: list|tuple, route_id: str|None = None, assert_new_id: bool = True) -> None:
+    def add_route(self, routing: list | tuple, route_id: str | None = None, *, assert_new_id: bool = True) -> None:
         """
         Add a new route. If only 2 edge IDs are given, vehicles calculate
         optimal route at insertion, otherwise vehicles take specific edges.
         
         Args:
             `routing` (list, tuple): List of edge IDs
-            `route_id` (str, optional):Route ID, if not given, generated from origin-destination
+            `route_id` (str, optional): Route ID, if not given, generated from origin-destination
             `assert_new_id` (bool): If True, an error is thrown for duplicate route IDs
         """
         
@@ -3403,7 +3495,7 @@ class Simulation:
                 desc = "No valid path between edges '{0}' and '{1}.".format(routing[0], routing[-1])
                 raise_error(ValueError, desc, self.curr_step)
 
-    def get_vehicle_vals(self, vehicle_ids: str|list|tuple, data_keys: str|list) -> dict|str|int|float|list:
+    def get_vehicle_vals(self, vehicle_ids: str | list | tuple, data_keys: str | list) -> dict | str | int | float | list:
         """
         Get data values for specific vehicle using a list of data keys. Valid data keys are;
         
@@ -3443,7 +3535,7 @@ class Simulation:
             elif isinstance(data_keys, (list, tuple)):
                 return_val = len(data_keys) == 1
             else:
-                desc = "Invalid data_keys given '{0}' (must be [str|(str)], not '{1}').".format(data_keys, type(data_keys).__name__)
+                desc = "Invalid data_keys given '{0}' (must be [str | (str)], not '{1}').".format(data_keys, type(data_keys).__name__)
                 raise_error(TypeError, desc, self.curr_step)
             
             data_vals, vehicle_known = {}, vehicle_id in self._known_vehicles.keys()
@@ -3627,7 +3719,7 @@ class Simulation:
 
         return all_data_vals
     
-    def get_vehicle_data(self, vehicle_ids: str|list|tuple, refresh: bool = False) -> dict|None:
+    def get_vehicle_data(self, vehicle_ids: str | list | tuple, *, refresh: bool = False) -> dict | None:
         """
         Get data for specified vehicle(s).
         
@@ -3636,7 +3728,7 @@ class Simulation:
             `refresh` (bool): Denotes whether to update static vehicle data
         
         Returns:
-            (dict, optional):Vehicle data dictionary, returns None if does not exist in simulation
+            (dict, optional): Vehicle data dictionary, returns None if does not exist in simulation
         """
 
         all_vehicle_data = {}
@@ -3700,13 +3792,13 @@ class Simulation:
 
         return all_vehicle_data
 
-    def _get_all_vehicle_data(self, vehicle_types: list|tuple|None = None) -> dict:
+    def _get_all_vehicle_data(self, vehicle_types: list | tuple | None = None) -> dict:
         """
         Collects aggregated vehicle data (no. vehicles & no. waiting vehicles) and all individual vehicle data.
         Also calculates edge/lane flow, delay and density for the last time step.
         
         Args:
-            `vehicle_types` (list, tuple, optional):Type(s) of vehicles to include
+            `vehicle_types` (list, tuple, optional): Type(s) of vehicles to include
         
         Returns:
             dict: no vehicles, no waiting, all vehicle data
@@ -3822,7 +3914,7 @@ class Simulation:
 
         return total_vehicle_data, all_vehicle_data
     
-    def get_geometry_vals(self, geometry_ids: str|list|tuple, data_keys: str|list) -> dict|str|int|float|list:
+    def get_geometry_vals(self, geometry_ids: str | list | tuple, data_keys: str | list) -> dict | str | int | float | list:
         """
         Get data values for specific edge or lane using a list of data keys. Valid data keys are:
         
@@ -3865,7 +3957,7 @@ class Simulation:
             elif isinstance(data_keys, (list, tuple)):
                 return_val = len(data_keys) == 1
             else:
-                desc = "Invalid data_keys given '{0}' (must be [str|(str)], not '{1}').".format(data_keys, type(data_keys).__name__)
+                desc = "Invalid data_keys given '{0}' (must be [str | (str)], not '{1}').".format(data_keys, type(data_keys).__name__)
                 raise_error(TypeError, desc, self.curr_step)
             
             data_vals, subscribed_data = {}, g_class.getSubscriptionResults(geometry_id)
@@ -4006,7 +4098,7 @@ class Simulation:
 
         return all_data_vals
 
-    def set_geometry_vals(self, geometry_ids: str|list|tuple, **kwargs) -> None:
+    def set_geometry_vals(self, geometry_ids: str | list | tuple, **kwargs) -> None:
         """
         Calls the TraCI API to change a edge or lane's state.
 
@@ -4059,7 +4151,7 @@ class Simulation:
                                 desc = f"({command}): Invalid speed value '{value}{min_unit}' (must be >= {min_value}{min_unit})."
                                 raise_error(ValueError, desc, self.curr_step)
                         else:
-                            desc = "({0}): Invalid max_speed value '{1}' (must be [int|float], not '{2}').".format(command, value, type(value).__name__)
+                            desc = "({0}): Invalid max_speed value '{1}' (must be [int | float], not '{2}').".format(command, value, type(value).__name__)
                             raise_error(TypeError, desc, self.curr_step)
                     case "allowed":
                         if g_name != "lane":
@@ -4113,13 +4205,13 @@ class Simulation:
                             desc = "({0}): Invalid right_lc value '{1}' (must be [str], not '{2}').".format(command, value, type(value).__name__)
                             raise_error(TypeError, desc, self.curr_step)
             
-    def get_last_step_geometry_vehicles(self, geometry_ids: str|list, vehicle_types: list|None = None, flatten: bool = False) -> dict|list:
+    def get_last_step_geometry_vehicles(self, geometry_ids: str | list, *, vehicle_types: list | None = None, flatten: bool = False) -> dict | list:
         """
         Get the IDs of vehicles on a lane or egde, by geometry ID.
         
         Args:
             `geometry_ids` (str, list):  Edge/lane ID or list of IDs
-            `vehicle_types` (list, optional):Included vehicle type IDs
+            `vehicle_types` (list, optional): Included vehicle type IDs
             `flatten` (bool): If `True`, all IDs are returned in a 1D array, else a dict with vehicles for each edge/lane
         
         Returns:
@@ -4144,7 +4236,7 @@ class Simulation:
 
         return vehicle_ids
     
-    def geometry_exists(self, geometry_id: str|int) -> str|None:
+    def geometry_exists(self, geometry_id: str | int) -> str | None:
         """
         Get geometry type by ID, if geometry with the ID exists.
         
@@ -4152,7 +4244,7 @@ class Simulation:
             `geometry_id` (str, int): Lane or edge ID
         
         Returns:
-            (str, optional):  Geometry type ['_edge_'|'_lane_'], or `None` if it does not exist
+            (str, optional):  Geometry type ['_edge_' | '_lane_'], or `None` if it does not exist
         """
 
         geometry_id = validate_type(geometry_id, str, "geometry_id", self.curr_step)
@@ -4161,7 +4253,7 @@ class Simulation:
         elif geometry_id in self._all_lanes: return "lane"
         else: return None
 
-    def detector_exists(self, detector_id: str) -> str|None:
+    def detector_exists(self, detector_id: str) -> str | None:
         """
         Get detector type by ID, if a detector with the ID exists.
         
@@ -4169,7 +4261,7 @@ class Simulation:
             `detector_id` (str): Detector ID
         
         Returns:
-            (str, optional):Detector type, or `None` if it does not exist
+            (str, optional): Detector type, or `None` if it does not exist
         """
 
         detector_id = validate_type(detector_id, str, "detector_id", self.curr_step)
@@ -4178,7 +4270,7 @@ class Simulation:
             return self.available_detectors[detector_id]["type"]
         else: return None
 
-    def route_exists(self, route_id: str) -> str|None:
+    def route_exists(self, route_id: str) -> str | None:
         """
         Get route edges by ID, if a route with the ID exists.
         
@@ -4186,7 +4278,7 @@ class Simulation:
             `route_id` (str): Route ID
         
         Returns:
-            (str, optional):List of route edges, or `None` if it does not exist.
+            (str, optional): List of route edges, or `None` if it does not exist.
         """
 
         route_id = validate_type(route_id, str, "route_id", self.curr_step)
@@ -4210,12 +4302,12 @@ class Simulation:
 
         return vehicle_type_id in list(self._vehicle_types) + list(self._added_vehicle_types)
 
-    def get_event_ids(self, event_statuses: str|list|tuple|None = None) -> list:
+    def get_event_ids(self, event_statuses: str | list | tuple | None = None) -> list:
         """
         Return event IDs by status, one or more of '_scheduled_', '_active_' or '_completed_'.
         
         Args:
-            `event_statuses` (str, list, tuple, optional):Event status type or list of types
+            `event_statuses` (str, list, tuple, optional): Event status type or list of types
         
         Returns:
             list: List of event IDs
@@ -4225,16 +4317,16 @@ class Simulation:
         if isinstance(event_statuses, str): event_statuses = [event_statuses]
         elif event_statuses == None: event_statuses = valid_statuses
         elif not isinstance(event_statuses, (list, tuple)):
-            desc = "Invalid event_statuses '{0}' type (must be [str|list|tuple], not '{1}').".format(event_statuses, type(event_statuses).__name__)
+            desc = "Invalid event_statuses '{0}' type (must be [str | list | tuple], not '{1}').".format(event_statuses, type(event_statuses).__name__)
             raise_error(TypeError, desc, self.curr_step)
         
         if len(set(event_statuses) - set(valid_statuses)) != 0:
-            desc = "Invalid event_statuses (must only include ['scheduled'|'active'|'completed'])."
+            desc = "Invalid event_statuses (must only include ['scheduled' | 'active' | 'completed'])."
             raise_error(KeyError, desc, self.curr_step)
 
         return self._scheduler.get_event_ids(event_statuses)
 
-    def event_exists(self, event_id: str) -> str|None:
+    def event_exists(self, event_id: str) -> str | None:
         """
         Get whether event with the given ID exists.
         
@@ -4242,7 +4334,7 @@ class Simulation:
             `event_id` (str): Event ID
         
         Returns:
-            (str, optional):Returns `None` if it does not exist, otherwise status ['_scheduled_'|'_active_'|'_completed_']
+            (str, optional): Returns `None` if it does not exist, otherwise status ['_scheduled_' | '_active_' | '_completed_']
         """
 
         if self._scheduler == None: return None
@@ -4260,7 +4352,7 @@ class Simulation:
         """
         return self._scheduler.get_event(event_id)
     
-    def remove_events(self, event_ids: str|list|tuple|None = None) -> None:
+    def remove_events(self, event_ids: str | list | tuple | None = None) -> None:
         """
         Remove event(s) from the simulation. Scheduled and completed events are deleted
         from the event scheduler, whilst active events are terminated early. Defaults
@@ -4282,7 +4374,7 @@ class Simulation:
             desc = "Invalid event_ids '[]' (given empty list)."
             raise_error(ValueError, desc, self.curr_step)
 
-    def controller_exists(self, controller_id: str) -> str|None:
+    def controller_exists(self, controller_id: str) -> str | None:
         """
         Get whether controller with ID controller_id exists.
         
@@ -4290,18 +4382,18 @@ class Simulation:
             `controller_id` (str): Controller ID
         
         Returns:
-            (str, optional):Returns `None` if it does not exist, otherwise type ['_VSLController_'|'_RGController_']
+            (str, optional): Returns `None` if it does not exist, otherwise type ['_VSLController_' | '_RGController_']
         """
 
         if controller_id in self.controllers: return self.controllers[controller_id].__name__()
         else: return None
 
-    def get_controller_ids(self, controller_types: str|list|tuple|None = None) -> list:
+    def get_controller_ids(self, controller_types: str | list | tuple | None = None) -> list:
         """
         Return list of all controller IDs, or controllers of specified type ('VSLController' or 'RGController').
         
         Args:
-            `controller_types` (str, list, tuple, optional):Controller type, defaults to all
+            `controller_types` (str, list, tuple, optional): Controller type, defaults to all
         
         Returns:
             list: Controller IDs
@@ -4311,16 +4403,16 @@ class Simulation:
         if isinstance(controller_types, str): controller_types = [controller_types]
         elif controller_types == None: controller_types = valid_types
         elif not isinstance(controller_types, (list, tuple)):
-            desc = "Invalid controller_types '{0}' type (must be [str|list|tuple], not '{1}').".format(controller_types, type(controller_types).__name__)
+            desc = "Invalid controller_types '{0}' type (must be [str | list | tuple], not '{1}').".format(controller_types, type(controller_types).__name__)
             raise_error(TypeError, desc, self.curr_step)
         
         if len(set(controller_types) - set(valid_types)) != 0:
-            desc = "Invalid controller_types (must only include ['VSLController'|'RGController'])."
+            desc = "Invalid controller_types (must only include ['VSLController' | 'RGController'])."
             raise_error(KeyError, desc, self.curr_step)
 
         return list([c_id for c_id, c in self.controllers.items() if c.__name__() in controller_types])
 
-    def remove_controllers(self, controller_ids: str|list|tuple) -> None:
+    def remove_controllers(self, controller_ids: str | list | tuple) -> None:
         """
         Remove controllers and delete their collected data.
         
@@ -4340,7 +4432,7 @@ class Simulation:
                 desc = "Controller with ID '{0}' not found.".format(controller_id)
                 raise_error(KeyError, desc, self.curr_step)
 
-    def stop_vehicle(self, vehicle_id: str, duration: int|float|None = None, lane_idx: int|None = None, pos: int|float|None = None) -> None:
+    def stop_vehicle(self, vehicle_id: str, duration: int | float | None = None, *, lane_idx: int | None = None, pos: int | float | None = None) -> None:
         """
         Stops a vehicle at a given/random position along the next edge. The vehicle will try to stay
         in the same lane when stopping if available. If not, the vehicle will stop in the outermost lane.
@@ -4362,7 +4454,7 @@ class Simulation:
     
         if pos == None: pos = random()
         elif not isinstance(pos, (int, float)):
-            desc = f"Invalid pos value '{pos}' (must be [int|float], not '{type(pos).__name__}')."
+            desc = f"Invalid pos value '{pos}' (must be [int | float], not '{type(pos).__name__}')."
             raise_error(TypeError, desc, self.curr_step)
         elif pos < 0 or pos > 1:
             desc = f"Invalid pos value '{pos}' (must be 0 <= pos < 1)."
@@ -4406,7 +4498,7 @@ class Simulation:
             elif not self._suppress_warnings:
                 raise_warning(f"Vehicle '{vehicle_id}' has not stopped yet (cannot resume).")
                 
-    def gui_track_vehicle(self, vehicle_id: str, view_id: str|None = None, highlight: bool = True) -> None:
+    def gui_track_vehicle(self, vehicle_id: str, view_id: str | None = None, *, highlight: bool = True) -> None:
         """
         Sets GUI view to track a vehicle by ID.
 
@@ -4430,7 +4522,7 @@ class Simulation:
 
         self._gui_veh_tracking[view_id] = vehicle_id
 
-    def gui_stop_tracking(self, view_id: str|None) -> None:
+    def gui_stop_tracking(self, view_id: str | None) -> None:
         """
         Stops GUI view from tracking vehicle.
 
@@ -4455,7 +4547,7 @@ class Simulation:
 
         del self._gui_veh_tracking[view_id]
 
-    def gui_is_tracking(self, view_id: str|None = None) -> bool:
+    def gui_is_tracking(self, view_id: str | None = None) -> bool:
         """
         Returns whether a GUI view is tracking a vehicle.
 
@@ -4465,7 +4557,7 @@ class Simulation:
         
         return view_id in self._gui_veh_tracking
     
-    def add_gui_view(self, view_id: str, bounds: list|tuple|None = None, zoom: int|float|None = None) -> None:
+    def add_gui_view(self, view_id: str, bounds: list | tuple | None = None, zoom: int | float | None = None) -> None:
         """
         Adds a new GUI view.
         
@@ -4513,7 +4605,7 @@ class Simulation:
 
         return [self._default_view] + self._gui_views
     
-    def get_view_boundaries(self, view_id: str|None = None) -> tuple:
+    def get_view_boundaries(self, view_id: str | None = None) -> tuple:
         """
         Returns the boundaries of a view (defaults to default view).
 
@@ -4536,7 +4628,7 @@ class Simulation:
 
         return traci.gui.getBoundary(view_id)
     
-    def get_view_zoom(self, view_id: str|None = None) -> int:
+    def get_view_zoom(self, view_id: str | None = None) -> int:
         """
         Returns the zoom level of a view (defaults to default view).
 
@@ -4559,7 +4651,7 @@ class Simulation:
 
         return traci.gui.getZoom(view_id)
     
-    def set_view(self, view_id: str|None = None, bounds: list|tuple|None = None, zoom: int|float|None = None) -> None:
+    def set_view(self, view_id: str | None = None, bounds: list | tuple | None = None, zoom: int | float | None = None) -> None:
         """
         Sets the bounds and/or zoom level of a GUI view.
 
@@ -4584,7 +4676,7 @@ class Simulation:
             traci.gui.setBoundary(view_id, bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1])
         if zoom != None: traci.gui.setZoom(view_id, zoom)
 
-    def take_screenshot(self, filename: str, view_id: str|None = None, bounds: list|tuple|None = None, zoom: int|float|None = None) -> None:
+    def take_screenshot(self, filename: str, view_id: str | None = None, bounds: list | tuple | None = None, zoom: int | float | None = None) -> None:
         """
         Takes a screenshot of a GUI view and saves result to a file.
 
@@ -4629,7 +4721,7 @@ class Simulation:
         
         print_sim_data_struct(self._all_data)
 
-def print_sim_data_struct(sim_data: Simulation|dict|str) -> None:
+def print_sim_data_struct(sim_data: Simulation | dict | str) -> None:
     """
     Prints the structure of a sim_data dictionary, from a Simulation
     object, dict or filepath, with keys and data types for values. Lists/tuples
@@ -4732,7 +4824,7 @@ def _get_phase_string(curr_phases, masks):
 class TrackedJunction:
     """ Junction object with automatic data collection. """
 
-    def __init__(self, junc_id: str, simulation: Simulation, junc_params: dict|str=None) -> None:
+    def __init__(self, junc_id: str, simulation: Simulation, junc_params: dict | str=None) -> None:
         """
         Args:
             `junc_id` (str): Junction ID
@@ -4982,7 +5074,14 @@ class TrackedJunction:
                     desc = f"Cannot update meter '{self.id}' queue length (no detector or entry/exit edges)"
                     raise_error(KeyError, desc, self.sim.curr_step)
 
-    def set_metering_rate(self, metering_rate: int|float, g_time: int|float = 1, y_time: int|float = 1, min_red: int|float = 1, vehs_per_cycle: int|None = None, control_interval: int|float = 60):
+    def set_metering_rate(self,
+                          metering_rate: int | float,
+                          *,
+                          g_time: int | float = 1,
+                          y_time: int | float = 1,
+                          min_red: int | float = 1,
+                          vehs_per_cycle: int | None = None,
+                          control_interval: int | float = 60):
         """
         Set ramp metering rate of a meter at a junction. Uses a one-car-per-green policy with a default
         1s green and yellow time, with red phase duration changed to set flow. All phase durations must
@@ -4993,7 +5092,7 @@ class TrackedJunction:
             `g_time` (int, float): Green phase duration (s), defaults to 1
             `y_time` (int, float): Yellow phase duration (s), defaults to 1
             `min_red` (int, float): Minimum red phase duration (s), defaults to 1
-            `vehs_per_cycle` (int, optional):Number of vehicles released with each cycle, defaults to the number of lanes
+            `vehs_per_cycle` (int, optional): Number of vehicles released with each cycle, defaults to the number of lanes
             `control_interval` (int, float): Ramp meter control interval (s)
         """
 
@@ -5001,7 +5100,7 @@ class TrackedJunction:
             desc = f"Cannot set metering rate (Junction ID '{self.id}' is not a metered junction)."
             raise_error(SimulationError, desc, self.sim.curr_step)
         
-        self.sim.set_tl_metering_rate(self.id, metering_rate, g_time, y_time, min_red, vehs_per_cycle, control_interval)
+        self.sim.set_tl_metering_rate(self.id, metering_rate, g_time=g_time, y_time=y_time, min_red=min_red, vehs_per_cycle=vehs_per_cycle, control_interval=control_interval)
 
 class TrackedEdge:
     """ Edge object with automatic data collection. """
@@ -5107,7 +5206,7 @@ def _get_distance_on_road(veh_coors, linestring):
     x_pct = x_val/line.length
     return x_pct
 
-def print_summary(sim_data: dict|str, save_file: str|None=None, tab_width: int=58):
+def print_summary(sim_data: dict | str, save_file: str | None=None, tab_width: int=58):
     """
     Prints a summary of a sim_data file or dictionary, listing
     simulation details, vehicle statistics, detectors, controllers,
@@ -5115,7 +5214,7 @@ def print_summary(sim_data: dict|str, save_file: str|None=None, tab_width: int=5
     
     Args:
         `sim_data` (dict, str):  Simulation data dictionary or filepath
-        `save_file` (str, optional):'_.txt_' filename, if given will be used to save summary
+        `save_file` (str, optional): '_.txt_' filename, if given will be used to save summary
         `tab_width` (int): Table width
     """
     caller = "{0}()".format(inspect.stack()[0][3])
@@ -5322,7 +5421,7 @@ def _table_print(strings=None, tab_width=58, side=" | ", padding=" ", centre_col
             col_spacing = padding*math.floor((tab_width - sum([len(str(string)) for string in strings])) / (len(strings) - 1))
             print_str = side+col_spacing.join([str(string) for string in strings])+side
     else:
-        desc = "_table_print(): Invalid type (must be [str|list|tuple], not '{0}').".format(type(strings).__name__)
+        desc = "_table_print(): Invalid type (must be [str | list | tuple], not '{0}').".format(type(strings).__name__)
         raise TypeError(desc)
     
     if print_str != None:

@@ -146,7 +146,7 @@ def _get_type_str(valid_types, connector=","):
                 for t in vt:
                     if isinstance(t, type): vt_arr.append(t.__name__)
                     else: vt_arr.append(type(t).__name__)
-                types.append("[{0}]".format("|".join(vt_arr)))
+                types.append("[{0}]".format(" | ".join(vt_arr)))
 
         return "[{0}]".format(connector.join(types))
     
@@ -188,7 +188,7 @@ def validate_list_types(values, valid_types, element_wise=False, param_name=None
     else:
         invalid = True
         if not return_validity:
-            if desc == None: desc = "Invalid {0} (must be '[list|tuple]', not '{1}').".format(param_name, type(values).__name__)
+            if desc == None: desc = "Invalid {0} (must be '[list | tuple]', not '{1}').".format(param_name, type(values).__name__)
             if 'self' in inspect.currentframe().f_back.f_locals:
                 caller = inspect.currentframe().f_back.f_locals['self'].__name__() + "."
             else: caller = ""
@@ -198,7 +198,7 @@ def validate_list_types(values, valid_types, element_wise=False, param_name=None
             raise TypeError(error_msg)
     
     if invalid and not return_validity:
-        if desc == None: desc = "Invalid value found in {0} at idx {1} (must be '{3}', '{2}' is '{4}').".format(param_name, inv_idx, inv_val, _get_type_str(valid_types, "|"), type(value).__name__)
+        if desc == None: desc = "Invalid value found in {0} at idx {1} (must be '{3}', '{2}' is '{4}').".format(param_name, inv_idx, inv_val, _get_type_str(valid_types, " | "), type(value).__name__)
         if 'self' in inspect.currentframe().f_back.f_locals:
             caller = inspect.currentframe().f_back.f_locals['self'].__name__() + "."
         else: caller = ""
@@ -217,7 +217,7 @@ def validate_type(value, valid_types, param_name=None, curr_sim_step=None, retur
         else:
             param_name = param_name if param_name != None else "input"
             val_str = "" if len(str(value)) >= 20 else "'{0}' ".format(value)
-            desc = "Invalid {0} {1}(must be '{2}', not '{3}').".format(param_name, val_str, _get_type_str(valid_types, "|"), type(value).__name__)
+            desc = "Invalid {0} {1}(must be '{2}', not '{3}').".format(param_name, val_str, _get_type_str(valid_types, " | "), type(value).__name__)
             if 'self' in inspect.currentframe().f_back.f_locals:
                 caller = inspect.currentframe().f_back.f_locals['self'].__name__() + "."
             else: caller = ""
@@ -253,10 +253,10 @@ def convert_units(values, orig_units, new_units, step_length=1, keep_arr=False):
     
     if isinstance(values, (int, float)): values = [values]
     elif not isinstance(values, (list, tuple)):
-        desc = "Invalid values '{0}' type (must be [int|float|list|tuple], not '{1}').".format(values, type(values).__name__)
+        desc = "Invalid values '{0}' type (must be [int | float | list | tuple], not '{1}').".format(values, type(values).__name__)
         raise_error(TypeError, desc)
     elif False in [isinstance(val, (int, float)) for val in values]:
-        desc = "Invalid values '{0}' type (list must be only contain [int|float]).".format(values)
+        desc = "Invalid values '{0}' type (list must be only contain [int | float]).".format(values)
         raise_error(ValueError, desc)
 
     c_mats = {"distance":
@@ -322,7 +322,7 @@ def colour_to_rgba(colour, curr_step=None, err_prefix=None):
             raise_error(ValueError, desc, curr_step)
         colour = tuple(int(colour[i:i+2], 16) for i in (0, 2, 4))
     elif not isinstance(colour, (list, tuple)):
-        desc = f"{err_prefix}Invalid colour (must be [str|list|tuple], not '{type(colour).__name__}')."
+        desc = f"{err_prefix}Invalid colour (must be [str | list | tuple], not '{type(colour).__name__}')."
         raise_error(TypeError, desc, curr_step)
     elif len(colour) not in [3, 4] or all(x > 255 for x in colour) or all(x < 0 for x in colour):
         desc = f"{err_prefix}'{colour}' is not a valid RGB or RGBA colour."
@@ -370,7 +370,7 @@ def get_scenario_name(filepath: str) -> str:
     elif cfg_file.endswith('.net.xml'): cfg_file = cfg_file.removesuffix('.net.xml')
     return cfg_file
 
-def load_params(parameters: str|dict, params_name: str|None = None, step: int|None = None) -> dict:
+def load_params(parameters: str | dict, params_name: str | None = None, step: int | None = None) -> dict:
     """
     Load parameters file. Handles either dict or json file.
     
@@ -388,7 +388,7 @@ def load_params(parameters: str|dict, params_name: str|None = None, step: int|No
     if params_name == None: params_name = "parameter input"
 
     if not isinstance(parameters, (dict, str)):
-        raise TypeError("{0}: Invalid {1} (must be [dict|filepath (str)], not '{2}').".format(caller, params_name, type(parameters).__name__))
+        raise TypeError("{0}: Invalid {1} (must be [dict | filepath (str)], not '{2}').".format(caller, params_name, type(parameters).__name__))
     elif isinstance(parameters, str):
         if parameters.endswith(".json"): r_class, r_mode = json, "r"
         elif parameters.endswith(".pkl"): r_class, r_mode = pkl, "rb"    
@@ -452,7 +452,7 @@ def get_axis_lim(data_vals, end_buff = 0.05):
         
     return max_val * pct_buff
 
-def limit_vals_by_range(time_steps, data_vals=None, time_range=None) -> list|tuple:
+def limit_vals_by_range(time_steps, data_vals=None, time_range=None) -> list | tuple:
     """
     For plotting, to limit data values between to those within a given time range.
     
@@ -501,7 +501,7 @@ def test_valid_string(input_string, valid_strings, param_name, case_sensitive=Tr
         desc = "Unknown {0} '{1}'".format(param_name, input_string)
         closest = get_most_similar_string(input_string, valid_strings, req_similarity)
         if closest != None: desc = desc + ". Did you mean '{0}'?".format(closest)
-        else: desc = desc + " (must be ['{0}']).".format("'|'".join(valid_strings))
+        else: desc = desc + " (must be ['{0}']).".format("' | '".join(valid_strings))
 
         return ValueError, desc
 
@@ -531,7 +531,7 @@ def test_input_dict(input_dict, valid_params, dict_name="", required=None) -> st
             return (KeyError, desc)
         if not isinstance(item, valid_params[key]):
             if isinstance(valid_params[key], (list, tuple)):
-                type_str = "[{0}]".format("|".join([str(val.__name__) for val in valid_params[key]]))
+                type_str = "[{0}]".format(" | ".join([str(val.__name__) for val in valid_params[key]]))
             else: type_str = valid_params[key].__name__
             desc = "Invalid {0} type '{1}' (must be '{2}' not '{3}')".format(key, item, type_str, type(item).__name__)
             return (TypeError, desc)

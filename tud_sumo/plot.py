@@ -91,7 +91,7 @@ class _GenericPlotter():
         self.stylesheet = stylesheet
         plt.style.use(self.stylesheet)
 
-    def _display_figure(self, filename: str|None=None) -> None:
+    def _display_figure(self, filename: str | None=None) -> None:
         """
         Display figure, either saving to file or showing on screen.
         
@@ -117,7 +117,7 @@ class _GenericPlotter():
     def _add_grid(self, ax, zorder=0):
         ax.grid(True, 'both', color='grey', linestyle='dashed', linewidth=0.5, zorder=zorder)
         
-    def _get_colour(self, colour: str|int|None=None, reset_wheel: bool=False) -> str:
+    def _get_colour(self, colour: str | int | None=None, reset_wheel: bool=False) -> str:
 
         if reset_wheel: self._next_colour_idx = 0
 
@@ -161,7 +161,7 @@ class _GenericPlotter():
         
         return colour
 
-    def _plot_event(self, ax, event_ids: str|list|None=None) -> None:
+    def _plot_event(self, ax, event_ids: str | list | None=None) -> None:
         """
         Plot events from the simulation data on a given axes.
         
@@ -225,12 +225,12 @@ class _GenericPlotter():
 class Plotter(_GenericPlotter):
     """ Visualisation class that plots TUD-SUMO data for one simulation. """
 
-    def __init__(self, simulation: Simulation|str, sim_label: str|None=None, time_unit: str="seconds", stylesheet: str="seaborn-v0_8-whitegrid", save_fig_loc: str="", save_fig_dpi: int=600, overwrite_figs: bool=True) -> None:
+    def __init__(self, simulation: Simulation | str, sim_label: str | None=None, time_unit: str="seconds", stylesheet: str="seaborn-v0_8-whitegrid", save_fig_loc: str="", save_fig_dpi: int=600, overwrite_figs: bool=True) -> None:
         """
         Args:
             `simulation` (Simulation, str): Either simulation object, sim_data dict or sim_data filepath
             `sim_label` (str, optional): Simulation or scenario label added to the beginning of all plot titles (set to 'scenario' for scenario name)
-            `time_unit` (str): Plotting time unit used for all plots (must be ['_steps_'|'_seconds_'|'_minutes_'|'_hours_'])
+            `time_unit` (str): Plotting time unit used for all plots (must be ['_steps_' | '_seconds_' | '_minutes_' | '_hours_'])
             `stylesheet` (str): Matplotlib stylesheet (defaults to 'seaborn-v0_8-whitegrid')
             `save_fig_loc` (str): Figure filepath when saving (defaults to current file)
             `save_fig_dpi` (int): Figure dpi when saving (defaults to 600dpi)
@@ -264,7 +264,7 @@ class Plotter(_GenericPlotter):
         elif isinstance(simulation, dict): self.sim_data, units, scenario_name = simulation, simulation["units"], simulation["scenario_name"]
 
         else:
-            desc = "Invalid simulation type (must be Simulation|str|dict, not '{0}').".format(type(simulation).__name__)
+            desc = "Invalid simulation type (must be Simulation | str | dict, not '{0}').".format(type(simulation).__name__)
             raise_error(TypeError, desc)
 
         if isinstance(sim_label, str) and sim_label.upper() == "SCENARIO": self.sim_label = scenario_name + ": "
@@ -280,7 +280,7 @@ class Plotter(_GenericPlotter):
     def __str__(self): return "<{0}>".format(self.__name__)
     def __name__(self): return "Plotter"
         
-    def plot_junc_flows(self, junc_id: str, vehicle_types: list|tuple|None=None, plot_all: bool=True, time_range: list|tuple|None=None, show_events: str|list|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_junc_flows(self, junc_id: str, vehicle_types: list | tuple | None=None, plot_all: bool=True, time_range: list | tuple | None=None, show_events: str | list | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot junction flow, either as inflow & outflow or number of vehicles at the intersection.
         
@@ -361,7 +361,7 @@ class Plotter(_GenericPlotter):
 
         self._display_figure(save_fig)
     
-    def plot_tl_colours(self, tl_id: str, plt_movements: list|tuple|None=None, plot_percent: bool=False, time_range: list|tuple|None=None, save_fig: str|None=None) -> None:
+    def plot_tl_colours(self, tl_id: str, plt_movements: list | tuple | None=None, plot_percent: bool=False, time_range: list | tuple | None=None, save_fig: str | None=None) -> None:
         """
         Plot traffic light sequence, as colours or green/red/yellow durations as a percent of time.
         
@@ -508,7 +508,7 @@ class Plotter(_GenericPlotter):
         fig.tight_layout()
         self._display_figure(save_fig)
 
-    def plot_rm_rate(self, rm_id: str, ax=None, yax_labels: bool=True, xax_labels: bool=True, show_legend: bool=True, time_range: list|tuple|None=None, show_events: str|list|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_rm_rate(self, rm_id: str, ax=None, yax_labels: bool=True, xax_labels: bool=True, show_legend: bool=True, time_range: list | tuple | None=None, show_events: str | list | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot ramp metering rate.
         
@@ -626,7 +626,7 @@ class Plotter(_GenericPlotter):
         if not is_subplot:
             self._display_figure(save_fig)
 
-    def plot_rm_rate_detector_data(self, rm_ids: str|list|tuple, all_detector_ids: list|tuple, data_key: str, aggregate_data: int=10, time_range: list|tuple|None=None, show_events: str|list|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_rm_rate_detector_data(self, rm_ids: str | list | tuple, all_detector_ids: list | tuple, data_key: str, aggregate_data: int=10, time_range: list | tuple | None=None, show_events: str | list | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot ramp metering rate next to detector data.
         
@@ -740,7 +740,7 @@ class Plotter(_GenericPlotter):
         fig.tight_layout()
         self._display_figure(save_fig)
 
-    def plot_rm_queuing(self, rm_id: str, ax=None, yax_labels: bool|list|tuple=True, xax_labels: bool=True, pct_capacity: bool=False, plot_delay: bool=True, cumulative_delay: bool=False, time_range: list|tuple|None=None, show_events: str|list|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_rm_queuing(self, rm_id: str, ax=None, yax_labels: bool | list | tuple=True, xax_labels: bool=True, pct_capacity: bool=False, plot_delay: bool=True, cumulative_delay: bool=False, time_range: list | tuple | None=None, show_events: str | list | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot ramp metering rate.
         
@@ -875,7 +875,7 @@ class Plotter(_GenericPlotter):
             fig.tight_layout()
             self._display_figure(save_fig)
 
-    def plot_rm_rate_queuing(self, rm_ids: str|list|tuple, plot_queuing: bool=True, time_range: list|tuple|None=None, show_events: str|list|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_rm_rate_queuing(self, rm_ids: str | list | tuple, plot_queuing: bool=True, time_range: list | tuple | None=None, show_events: str | list | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot meter queue length and delay.
         
@@ -933,7 +933,7 @@ class Plotter(_GenericPlotter):
         fig.tight_layout()
         self._display_figure(save_fig)
 
-    def plot_vehicle_data(self, data_key: str, plot_cumulative: bool=False, aggregation_steps: int|None=None, time_range: list|tuple|None=None, show_events: str|list|None=None, plt_colour: str|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_vehicle_data(self, data_key: str, plot_cumulative: bool=False, aggregation_steps: int | None=None, time_range: list | tuple | None=None, show_events: str | list | None=None, plt_colour: str | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot network-wide vehicle data.
         
@@ -953,7 +953,7 @@ class Plotter(_GenericPlotter):
             self.units = self.simulation.units.name
 
         if data_key not in ["no_vehicles", "no_waiting", "tts", "twt", "avg_wt", "delay", "avg_delay", "to_depart"]:
-            desc = "Unrecognised data key '{0}' (must be ['no_vehicles'|'no_waiting'|'tts'|'twt'|'avg_wt'|'delay'|'avg_delay'|'to_depart']).".format(data_key)
+            desc = "Unrecognised data key '{0}' (must be ['no_vehicles' | 'no_waiting' | 'tts' | 'twt' | 'avg_wt' | 'delay' | 'avg_delay' | 'to_depart']).".format(data_key)
             raise_error(KeyError, desc)
 
         fig, ax = plt.subplots(1, 1)
@@ -993,7 +993,7 @@ class Plotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_detector_data(self, detector_id: str, data_key: str, plot_cumulative: bool=False, aggregation_steps: int|None=None, time_range: list|tuple|None=None, show_events: str|list|None=None, plt_colour: str|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_detector_data(self, detector_id: str, data_key: str, plot_cumulative: bool=False, aggregation_steps: int | None=None, time_range: list | tuple | None=None, show_events: str | list | None=None, plt_colour: str | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot detector data.
         
@@ -1017,7 +1017,7 @@ class Plotter(_GenericPlotter):
         start, step = self.sim_data["start"], self.sim_data["step_len"]
 
         if data_key not in ["speeds", "vehicle_counts", "occupancies"]:
-            desc = "Unrecognised data key '{0}' (must be [speeds|vehicle_counts|occupancies]).".format(data_key)
+            desc = "Unrecognised data key '{0}' (must be [speeds | vehicle_counts | occupancies]).".format(data_key)
             raise_error(KeyError, desc)
         elif detector_id not in self.sim_data["data"]["detectors"].keys():
             desc = "Detector ID '{0}' not found.".format(detector_id)
@@ -1056,7 +1056,7 @@ class Plotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_edge_data(self, edge_id: str, data_key: str, plot_cumulative: bool=False, aggregation_steps: int|None=None, time_range: list|tuple|None=None, show_events: str|list|None=None, plt_colour: str|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_edge_data(self, edge_id: str, data_key: str, plot_cumulative: bool=False, aggregation_steps: int | None=None, time_range: list | tuple | None=None, show_events: str | list | None=None, plt_colour: str | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot tracked egde data.
         
@@ -1083,7 +1083,7 @@ class Plotter(_GenericPlotter):
             desc = "No TrackedEdge data found."
             raise_error(KeyError, desc)
         elif data_key not in ["flows", "speeds", "densities", "occupancies", "vehicle_counts"]:
-            desc = "Unrecognised data key '{0}' (must be [flows|speeds|densities|occupancies|vehicle_counts]).".format(data_key)
+            desc = "Unrecognised data key '{0}' (must be [flows | speeds | densities | occupancies | vehicle_counts]).".format(data_key)
             raise_error(KeyError, desc)
         elif edge_id not in self.sim_data["data"]["edges"].keys():
             desc = "Edge ID '{0}' not found.".format(edge_id)
@@ -1119,7 +1119,7 @@ class Plotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_demand(self, routing: str|list|tuple|None=None, demand_profiles: DemandProfile|list|tuple|None=None, time_range: list|tuple|None=None, show_events: str|list|None=None, plt_colour: str|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_demand(self, routing: str | list | tuple | None=None, demand_profiles: DemandProfile | list | tuple | None=None, time_range: list | tuple | None=None, show_events: str | list | None=None, plt_colour: str | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plots demand from TUD-SUMO DemandProfile(s). By default, all demand profiles are plotted.
         Demand defined within '_.rou.xml_' files is not plotted.
@@ -1158,7 +1158,7 @@ class Plotter(_GenericPlotter):
                 raise_error(KeyError, desc)
 
         else:
-            desc = f"Invalid demand_profiles (must be [DemandProfile|list|tuple|None], not '{type(demand_profiles)}')"
+            desc = f"Invalid demand_profiles (must be [DemandProfile | list | tuple | None], not '{type(demand_profiles)}')"
             raise_error(TypeError, desc)
 
         dps = [dp._demand_arrs if isinstance(dp, DemandProfile) else dp for dp in dps]
@@ -1233,7 +1233,7 @@ class Plotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_od_trip_times(self, od_pairs: list|tuple|None=None, vehicle_types: list|tuple|None=None, ascending_vals: bool=True, trip_time_unit: str="minutes", time_range: list|tuple|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_od_trip_times(self, od_pairs: list | tuple | None=None, vehicle_types: list | tuple | None=None, ascending_vals: bool=True, trip_time_unit: str="minutes", time_range: list | tuple | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plots average trip times for Origin-Destination pairs.
         
@@ -1241,14 +1241,14 @@ class Plotter(_GenericPlotter):
             `od_pairs` (list, tuple, optional): (n x 2) list containing OD pairs. If not given, all OD pairs are plotted
             `vehicle_types` (list, tuple, optional): List of vehicle types for included trips (defaults to all)
             `ascending_vals` (bool): If `True`, the largest values are plotted in the bottom-right, if `False`, top-left
-            `trip_time_unit` (str): Time unit for displaying values, must be ['_seconds_'|'_minutes_'|'_hours_'], defaults to '_minutes_'
+            `trip_time_unit` (str): Time unit for displaying values, must be ['_seconds_' | '_minutes_' | '_hours_'], defaults to '_minutes_'
             `time_range` (list, tuple, optional): Plotting time range (in plotter class units)
             `fig_title` (str, optional): If given, will overwrite default title
             `save_fig` (str, optional): Output image filename, will show image if not given
         """
         
         if trip_time_unit not in ["seconds", "minutes", "hours"]:
-            desc = "Invalid time unit '{0}' (must be ['seconds'|'minutes'|'hours']).".format(trip_time_unit)
+            desc = "Invalid time unit '{0}' (must be ['seconds' | 'minutes' | 'hours']).".format(trip_time_unit)
             raise_error(ValueError, desc)
         
         if self.simulation != None:
@@ -1362,7 +1362,7 @@ class Plotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_cumulative_curve(self, inflow_detectors: list|tuple|None=None, outflow_detectors: list|tuple|None=None, outflow_offset: int|float=0, time_range: list|tuple|None=None, show_events: str|list|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_cumulative_curve(self, inflow_detectors: list | tuple | None=None, outflow_detectors: list | tuple | None=None, outflow_offset: int | float=0, time_range: list | tuple | None=None, show_events: str | list | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot inflow and outflow cumulative curves, either system-wide or using inflow/outflow detectors (if given).
         
@@ -1465,7 +1465,7 @@ class Plotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_vsl_data(self, vsl_id: str, avg_geomtry_speeds: bool=False, time_range: list|tuple|None=None, show_events: str|list|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_vsl_data(self, vsl_id: str, avg_geomtry_speeds: bool=False, time_range: list | tuple | None=None, show_events: str | list | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot VSL settings and average vehicle speeds on affected edges.
         
@@ -1602,7 +1602,7 @@ class Plotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_rg_data(self, rg_id: str, time_range: list|tuple|None=None, show_events: str|list|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_rg_data(self, rg_id: str, time_range: list | tuple | None=None, show_events: str | list | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot how many vehicles are diverted by RG controller.
         
@@ -1685,14 +1685,14 @@ class Plotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_space_time_diagram(self, edge_ids: list|tuple, upstream_at_top: bool=True, dist_labels: list|tuple|None=None, time_range: list|tuple|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_space_time_diagram(self, edge_ids: list | tuple, upstream_at_top: bool=True, dist_labels: list | tuple | None=None, time_range: list | tuple | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot space time data from tracked edge data.
         
         Args:
             `edge_ids` (list, tuple): Single tracked egde ID or list of IDs
             `upstream_at_top` (bool): If `True`, upstream values are displayed at the top of the diagram
-            `dist_labels` (list, tuple, optional): A list of labels and distances (km/mi) to be plotted on the graph (as a list of (str, [int|float]) pairs)
+            `dist_labels` (list, tuple, optional): A list of labels and distances (km/mi) to be plotted on the graph (as a list of (str, [int | float]) pairs)
             `time_range` (list, tuple, optional): Plotting time range (in plotter class units)
             `fig_title` (str, optional): If given, will overwrite default title
             `save_fig` (str, optional): Output image filename, will show image if not given
@@ -1813,7 +1813,7 @@ class Plotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_trajectories(self, edge_ids: str|list|tuple, lane_idx: int|None=None, vehicle_pct: float=1, rnd_seed: int|None=None, dist_labels: list|tuple|None=None, time_range: list|tuple|None=None, show_events: str|list|None=None, plt_colour: str|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_trajectories(self, edge_ids: str | list | tuple, lane_idx: int | None=None, vehicle_pct: float=1, rnd_seed: int | None=None, dist_labels: list | tuple | None=None, time_range: list | tuple | None=None, show_events: str | list | None=None, plt_colour: str | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot vehicle trajectory data from tracked edge data.
         
@@ -1822,7 +1822,7 @@ class Plotter(_GenericPlotter):
             `lane_idx` (int, optional): Lane index for vehicles on all edges
             `vehicle_pct` (float): Percent of vehicles plotted (defaults to all)
             `rnd_seed` (int, optional): When `vehicle_pct < 1`, vehicles are selected randomly with `rnd_seed`
-            `dist_labels` (list, tuple, optional): A list of labels and distances (km/mi) to be plotted on the graph (as a list of (str, [int|float]) pairs)
+            `dist_labels` (list, tuple, optional): A list of labels and distances (km/mi) to be plotted on the graph (as a list of (str, [int | float]) pairs)
             `time_range` (list, tuple, optional): Plotting time range (in plotter class units)
             `show_events` (str, list, optional): Event ID, list of IDs, '_all_', '_scheduled_', '_active_', '_completed_' or `None`
             `plt_colour` (str, optional): Line colour for plot (defaults to TUD 'cyaan')
@@ -1992,14 +1992,14 @@ class Plotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_fundamental_diagram(self, edge_ids: list|tuple|str|None=None, x_axis: str="density", y_axis: str="flow", x_percentile: int=100, y_percentile: int=100, lr_degree: int|None=None, aggregation_steps: int=0, separate_edges: bool=False, point_size: int=3, time_range: list|tuple|None=None, plt_colour: str|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_fundamental_diagram(self, edge_ids: list | tuple | str | None=None, x_axis: str="density", y_axis: str="flow", x_percentile: int=100, y_percentile: int=100, lr_degree: int | None=None, aggregation_steps: int=0, separate_edges: bool=False, point_size: int=3, time_range: list | tuple | None=None, plt_colour: str | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot a fundamental diagram from tracked egde data.
         
         Args:
             `edge_ids` (list, tuple, str, optional): Single tracked edge ID or list of IDs
-            `x_axis` (str): x-axis variable ('_s_'|'_f_'|'_d_'|'_speed_'|'_flow_'|'_density_')
-            `y_axis` (str): y-axis variable ('_s_'|'_f_'|'_d_'|'_speed_'|'_flow_'|'_density_')
+            `x_axis` (str): x-axis variable ('_s_' | '_f_' | '_d_' | '_speed_' | '_flow_' | '_density_')
+            `y_axis` (str): y-axis variable ('_s_' | '_f_' | '_d_' | '_speed_' | '_flow_' | '_density_')
             `x_percentile` (int): x-axis value plotting percentile [1-100]
             `y_percentile` (int): y-axis value plotting percentile [1-100]
             `lr_degree` (int, optional): Degree of linear regression (LR) model (if given, regression line and R^2 value plotted)
@@ -2023,20 +2023,20 @@ class Plotter(_GenericPlotter):
         if edge_ids != None:
             if isinstance(edge_ids, str): edge_ids = [edge_ids]
             elif not isinstance(edge_ids, (list, tuple)):
-                desc = "Invalid edge_ids '{0}' type (must be '[str|list|tuple]' not '{1}')".format(edge_ids, type(edge_ids).__name__)
+                desc = "Invalid edge_ids '{0}' type (must be '[str | list | tuple]' not '{1}')".format(edge_ids, type(edge_ids).__name__)
                 raise_error(TypeError, desc)
         else:
             edge_ids = list(self.sim_data["data"]["edges"].keys())
 
         axes = {"S": "speed", "F": "flow", "D": "density"}
         if not isinstance(x_axis, str) or x_axis.upper() not in ["S", "F", "D", "SPEED", "FLOW", "DENSITY"]:
-            desc = "Invalid x_axis '{0}' (must be ['s'|'f'|'d'|'speed'|'flow'|'density']).".format(x_axis)
+            desc = "Invalid x_axis '{0}' (must be ['s' | 'f' | 'd' | 'speed' | 'flow' | 'density']).".format(x_axis)
             error = TypeError if not isinstance(x_axis, str) else ValueError
             raise_error(error, desc)
         elif x_axis in ['s', 'f', 'd']: x_axis = axes[x_axis.upper()]
 
         if not isinstance(y_axis, str) or y_axis.upper() not in ["S", "F", "D", "SPEED", "FLOW", "DENSITY"]:
-            desc = "Invalid y_axis '{0}' (must be ['s'|'f'|'d'|'speed'|'flow'|'density']).".format(y_axis)
+            desc = "Invalid y_axis '{0}' (must be ['s' | 'f' | 'd' | 'speed' | 'flow' | 'density']).".format(y_axis)
             error = TypeError if not isinstance(y_axis, str) else ValueError
             raise_error(error, desc)
         elif y_axis in ['s', 'f', 'd']: y_axis = axes[y_axis.upper()]
@@ -2166,7 +2166,7 @@ class Plotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_throughput(self, od_pair: list|tuple|None=None, vehicle_types: list|tuple|None=None, time_range: list|tuple|None=None, show_events: str|list|None=None, plt_colour: str|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_throughput(self, od_pair: list | tuple | None=None, vehicle_types: list | tuple | None=None, time_range: list | tuple | None=None, show_events: str | list | None=None, plt_colour: str | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plots vehicle throughput, ie. the rate of completed trips.
         
@@ -2204,7 +2204,7 @@ class Plotter(_GenericPlotter):
         self._plot_event(ax, show_events)
         self._display_figure(save_fig)
 
-    def plot_trip_time_histogram(self, od_pair: list|tuple|None=None, n_bins: int|None=None, cumulative_hist: bool=False, vehicle_types: list|tuple|None=None, time_range: list|tuple|None=None, plt_colour: str|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_trip_time_histogram(self, od_pair: list | tuple | None=None, n_bins: int | None=None, cumulative_hist: bool=False, vehicle_types: list | tuple | None=None, time_range: list | tuple | None=None, plt_colour: str | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plots a histogram for (completed) trip times, either network-wide or for a specific OD pair.
         
@@ -2271,13 +2271,13 @@ class Plotter(_GenericPlotter):
 class MultiPlotter(_GenericPlotter):
     """ Visualisation class that plots TUD-SUMO data for multiple simulations. """
 
-    def __init__(self, groups_title: str|None=None, scenario_label: str|None=None, units: str="metric", time_unit: str="seconds", sim_data_loc: str="", stylesheet: str="seaborn-v0_8-whitegrid", save_fig_loc: str="", save_fig_dpi: int=600, overwrite_figs: bool=True) -> None:
+    def __init__(self, groups_title: str | None=None, scenario_label: str | None=None, units: str="metric", time_unit: str="seconds", sim_data_loc: str="", stylesheet: str="seaborn-v0_8-whitegrid", save_fig_loc: str="", save_fig_dpi: int=600, overwrite_figs: bool=True) -> None:
         """
         Args:
             `groups_title` (str, optional): Groups title (ie. 'Algorithm' label when comparing results of different algorithms)
             `scenario_label` (str, optional): Scenario label added to the beginning of all plot titles
-            `units` (str): Simulation data units, must match all added simulations (must be ['_metric_'|'_imperial_'|'_uk_'])
-            `time_unit` (str): Plotting time unit used for all plots (must be ['_steps_'|'_seconds_'|'_minutes_'|'_hours_'])
+            `units` (str): Simulation data units, must match all added simulations (must be ['_metric_' | '_imperial_' | '_uk_'])
+            `time_unit` (str): Plotting time unit used for all plots (must be ['_steps_' | '_seconds_' | '_minutes_' | '_hours_'])
             `sim_data_loc` (str): Location of simulation data files (for all simulations)
             `stylesheet` (str): Matplotlib stylesheet (defaults to 'seaborn-v0_8-whitegrid')
             `save_fig_loc` (str): Figure filepath when saving (defaults to current file)
@@ -2305,7 +2305,7 @@ class MultiPlotter(_GenericPlotter):
     def __str__(self): return "<{0}>".format(self.__name__)
     def __name__(self): return "MultiPlotter"
 
-    def add_simulations(self, simulations: list|tuple, labels: list|tuple|None=None, groups: str|list|tuple|None=None, delete_edge_data: bool=False, delete_trip_data: bool=False, pbar: bool=True) -> None:
+    def add_simulations(self, simulations: list | tuple, labels: list | tuple | None=None, groups: str | list | tuple | None=None, delete_edge_data: bool=False, delete_trip_data: bool=False, pbar: bool=True) -> None:
         """
         Add simulation dataset(s) to the plotter. `simulations` and `labels` must have the same length, with each
         label corresponding to a simulation. By default, all simulations will use their scenario name as a labels,
@@ -2410,7 +2410,7 @@ class MultiPlotter(_GenericPlotter):
                 desc = "Simulation file '{0}' not found.".format(simulation)
                 raise_error(FileNotFoundError, desc)
 
-    def plot_vehicle_data(self, data_key: str, plot_cumulative: bool=False, plot_groups: list|tuple|None=None, plot_range: bool=True, aggregation_steps: int|None=None, time_range: list|tuple|None=None, show_events: str|list|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_vehicle_data(self, data_key: str, plot_cumulative: bool=False, plot_groups: list | tuple | None=None, plot_range: bool=True, aggregation_steps: int | None=None, time_range: list | tuple | None=None, show_events: str | list | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot network-wide vehicle data for each simulation.
         
@@ -2427,7 +2427,7 @@ class MultiPlotter(_GenericPlotter):
         """
 
         if data_key not in ["no_vehicles", "no_waiting", "tts", "twt", "avg_wt", "delay", "avg_delay", "to_depart"]:
-            desc = "Unrecognised data key '{0}' (must be ['no_vehicles'|'no_waiting'|'tts'|'twt'|'avg_wt'|'delay'|'avg_delay'|'to_depart']).".format(data_key)
+            desc = "Unrecognised data key '{0}' (must be ['no_vehicles' | 'no_waiting' | 'tts' | 'twt' | 'avg_wt' | 'delay' | 'avg_delay' | 'to_depart']).".format(data_key)
             raise_error(KeyError, desc)
 
         fig, ax = plt.subplots(1, 1)
@@ -2484,7 +2484,7 @@ class MultiPlotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_detector_data(self, detector_id: str, data_key: str, plot_cumulative: bool=False, plot_groups: list|tuple|None=None, plot_range: bool=True, aggregation_steps: int|None=None, time_range: list|tuple|None=None, show_events: str|list|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_detector_data(self, detector_id: str, data_key: str, plot_cumulative: bool=False, plot_groups: list | tuple | None=None, plot_range: bool=True, aggregation_steps: int | None=None, time_range: list | tuple | None=None, show_events: str | list | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot detector data from each simulation.
         
@@ -2502,7 +2502,7 @@ class MultiPlotter(_GenericPlotter):
         """
   
         if data_key not in ["speeds", "vehicle_counts", "occupancies"]:
-            desc = "Unrecognised data key '{0}' (must be [speeds|vehicle_counts|occupancies]).".format(data_key)
+            desc = "Unrecognised data key '{0}' (must be [speeds | vehicle_counts | occupancies]).".format(data_key)
             raise_error(KeyError, desc)
         
         fig, ax = plt.subplots(1, 1)
@@ -2562,7 +2562,7 @@ class MultiPlotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_edge_data(self, edge_id: str, data_key: str, plot_cumulative: bool=False, plot_groups: list|tuple|None=None, plot_range: bool=True, aggregation_steps: int|None=None, time_range: list|tuple|None=None, show_events: str|list|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_edge_data(self, edge_id: str, data_key: str, plot_cumulative: bool=False, plot_groups: list | tuple | None=None, plot_range: bool=True, aggregation_steps: int | None=None, time_range: list | tuple | None=None, show_events: str | list | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot tracked edge data from each simulation.
         
@@ -2580,7 +2580,7 @@ class MultiPlotter(_GenericPlotter):
         """
   
         if data_key not in ["flows", "speeds", "densities", "occupancies", "vehicle_counts"]:
-            desc = "Unrecognised data key '{0}' (must be [flows|speeds|densities|occupancies|vehicle_counts]).".format(data_key)
+            desc = "Unrecognised data key '{0}' (must be [flows | speeds | densities | occupancies | vehicle_counts]).".format(data_key)
             raise_error(KeyError, desc)
         
         fig, ax = plt.subplots(1, 1)
@@ -2640,7 +2640,7 @@ class MultiPlotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_throughput(self, od_pair: list|tuple|None=None, vehicle_types: list|tuple|None=None, plot_groups: list|tuple|None=None, plot_range: bool=True, time_range: list|tuple|None=None, show_events: str|list|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_throughput(self, od_pair: list | tuple | None=None, vehicle_types: list | tuple | None=None, plot_groups: list | tuple | None=None, plot_range: bool=True, time_range: list | tuple | None=None, show_events: str | list | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot vehicle throughput, ie. the rate of completed trips, for each simulation.
         
@@ -2695,7 +2695,7 @@ class MultiPlotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_rm_rate(self, rm_id: str, plot_groups: list|tuple|None=None, plot_range: bool=True, aggregation_steps: int|None=None, time_range: list|tuple|None=None, show_events: str|list|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_rm_rate(self, rm_id: str, plot_groups: list | tuple | None=None, plot_range: bool=True, aggregation_steps: int | None=None, time_range: list | tuple | None=None, show_events: str | list | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plot the average metering rate for a ramp meter in each simulation.
         
@@ -2784,7 +2784,7 @@ class MultiPlotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_rm_queue_length(self, rm_id: str, plot_distribution: bool=True, plot_groups: list|tuple|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_rm_queue_length(self, rm_id: str, plot_distribution: bool=True, plot_groups: list | tuple | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plots a boxplot showing the distribution of average queue lengths for each simulation group.
 
@@ -2865,7 +2865,7 @@ class MultiPlotter(_GenericPlotter):
         
         self._display_figure(save_fig)
 
-    def plot_statistics(self, data_key: str, plot_distribution: bool=True, plot_groups: list|tuple|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_statistics(self, data_key: str, plot_distribution: bool=True, plot_groups: list | tuple | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
         """
         Plots a boxplot showing the distribution of network-wide vehicle statistics (TTS/TWT/cumulative delay) for each simulation group.
 
@@ -2878,7 +2878,7 @@ class MultiPlotter(_GenericPlotter):
         """
 
         if data_key not in ["tts", "twt", "delay"]:
-            desc = f"Unrecognised data key '{data_key}' (must be ['tts'|'twt'|'delay'])."
+            desc = f"Unrecognised data key '{data_key}' (must be ['tts' | 'twt' | 'delay'])."
             raise_error(KeyError, desc)
         elif len(self.sim_group_ids) == 0:
             desc = "No data to plot (no groups added)."
@@ -2963,7 +2963,7 @@ class MultiPlotter(_GenericPlotter):
 
         return plotted, max_y_val
 
-def _get_throughput_x_y(sim_data: dict, time_unit: str, od_pair: list|tuple|None=None, vehicle_types: list|tuple|None=None, time_range: list|tuple|None=None):
+def _get_throughput_x_y(sim_data: dict, time_unit: str, od_pair: list | tuple | None=None, vehicle_types: list | tuple | None=None, time_range: list | tuple | None=None):
     if time_range == None: t_range = [-math.inf, math.inf]
     else: t_range = convert_units(time_range, time_unit, "steps", sim_data["step_len"])
 

@@ -56,7 +56,7 @@ class VSLController:
                     "activation_times": self.activation_times}
         return vsl_dict
     
-    def set_speed_limit(self, speed_limit: int|float|None = None) -> None:
+    def set_speed_limit(self, speed_limit: int | float | None = None) -> None:
         """
         Activates the VSL controller and sets a speed limit.
         
@@ -116,7 +116,7 @@ class VSLController:
 class RGController:
     """ Dynamic Route Guidance (RG) controller object. """
 
-    def __init__(self, rg_id: str|int, rg_params: dict, simulation):
+    def __init__(self, rg_id: str | int, rg_params: dict, simulation):
         """
         Args:
             `rg_id` (str): RG controller ID
@@ -191,7 +191,7 @@ class RGController:
         
         return rg_dict
     
-    def activate(self, old_target: str|int|None = None, new_target: str|int|None = None, diversion_pct: float|None = None, highlight_colour: str|None = None) -> None:
+    def activate(self, old_target: str | int | None = None, new_target: str | int | None = None, diversion_pct: float | None = None, highlight_colour: str | None = None) -> None:
         """
         Activates route guidance for drivers.
         

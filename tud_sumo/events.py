@@ -33,12 +33,12 @@ class EventScheduler:
     def __str__(self): return "<{0}>".format(self.__name__)
     def __name__(self): return "EventScheduler"
 
-    def get_event_ids(self, event_statuses: str|list|tuple|None=None) -> list:
+    def get_event_ids(self, event_statuses: str | list | tuple | None = None) -> list:
         """
         Gets all event IDs, or those of a specific status.
 
         Args:
-            `event_statuses` (str, list, tuple, optional): Event status or list of statuses from ['_scheduled_'|'_active_'|'_completed_'] (defaults to all)
+            `event_statuses` (str, list, tuple, optional): Event status or list of statuses from ['_scheduled_' | '_active_' | '_completed_'] (defaults to all)
 
         Returns:
             list: List of event IDs
@@ -57,12 +57,12 @@ class EventScheduler:
 
         return event_ids
     
-    def get_events(self, event_statuses: str|list|tuple|None=None) -> list:
+    def get_events(self, event_statuses: str | list | tuple | None = None) -> list:
         """
         Gets all events, or those of a specific status.
 
         Args:
-            `event_statuses` (str, list, tuple, optional): Event status or list of statuses from ['_scheduled_'|'_active_'|'_completed_'] (defaults to all)
+            `event_statuses` (str, list, tuple, optional): Event status or list of statuses from ['_scheduled_' | '_active_' | '_completed_'] (defaults to all)
 
         Returns:
             list: List of events
@@ -122,7 +122,7 @@ class EventScheduler:
                     if isinstance(event_params, Event): self.scheduled_events[event_id] = event_params
                     elif isinstance(event_params, dict): self.scheduled_events[event_id] = Event(event_id, event_params, self.sim)
                     else:
-                        desc = "Invalid event_params dict (must contain [dict|Event], not '{0}').".format(type(event_params).__name__)
+                        desc = "Invalid event_params dict (must contain [dict | Event], not '{0}').".format(type(event_params).__name__)
                         raise_error(TypeError, desc, self.sim.curr_step)
 
             elif isinstance(events, str):
@@ -145,7 +145,7 @@ class EventScheduler:
                 for event in events: self.scheduled_events[event.id] = event
             
             else:
-                desc = "Invalid event_params (must be [dict|filepath|(Event)], not '{0}').".format(type(events).__name__)
+                desc = "Invalid event_params (must be [dict | filepath | (Event)], not '{0}').".format(type(events).__name__)
                 raise_error(TypeError, desc, self.sim.curr_step)
 
     def update_events(self):
@@ -168,7 +168,7 @@ class EventScheduler:
                 del self.active_events[event_id]
                 self.completed_events[event_id] = event
 
-    def get_event_status(self, event_id: str) -> str|None:
+    def get_event_status(self, event_id: str) -> str | None:
         """
         Get the status of an event, by its ID.
         
@@ -176,7 +176,7 @@ class EventScheduler:
             `event_id` (str): Event ID
         
         Returns:
-            (str, optional): Event status ['_scheduled_'|'_active_'|'_completed_'], or `None` if it does not exist
+            (str, optional): Event status ['_scheduled_' | '_active_' | '_completed_'], or `None` if it does not exist
         """
 
         if event_id in self.scheduled_events.keys(): return "scheduled"
@@ -187,7 +187,7 @@ class EventScheduler:
 class Event:
     """ A scheduled event, where effects are carried out for a specified amount of time. """
 
-    def __init__(self, event_id: str, event_params: str|dict, simulation):
+    def __init__(self, event_id: str, event_params: str | dict, simulation):
         """
         Args:
             `event_id` (str): Event ID
@@ -201,7 +201,7 @@ class Event:
         self._init_params = event_params
 
         if not isinstance(event_params, dict) and not isinstance(event_params, str):
-            desc = "Invalid event_params (must be [dict|filepath (str)], not '{0}').".format(type(event_params).__name__)
+            desc = "Invalid event_params (must be [dict | filepath (str)], not '{0}').".format(type(event_params).__name__)
             raise_error(TypeError, desc, self.sim.curr_step)
         elif isinstance(event_params, str):
             if event_params.endswith(".json"): r_class, r_mode = json, "r"

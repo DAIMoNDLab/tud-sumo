@@ -4,7 +4,7 @@ from .utils import *
 
 class DemandProfile:
 
-    def __init__(self, simulation=None, step_length=1):
+    def __init__(self, simulation = None, step_length = 1):
         from .simulation import Simulation
 
         self.id = None
@@ -29,7 +29,7 @@ class DemandProfile:
 
     def __name__(self): return "DemandProfile"
 
-    def _generate_id(self, n: int=10): 
+    def _generate_id(self, n: int = 10): 
         """ Generates random ID of length 'n'."""
 
         return ''.join(rnd.choice(string.ascii_uppercase + string.digits) for _ in range(n))
@@ -79,7 +79,7 @@ class DemandProfile:
             end_times = [arr[1][1] for arr in self._demand_arrs]
             return max(end_times) > self._sim.curr_step
         
-    def plot_demand(self, routing: str|list|tuple|None=None, save_fig: str|None=None) -> None:
+    def plot_demand(self, routing: str | list | tuple | None = None, save_fig: str | None = None) -> None:
         """
         Plots demand within a demand profile. Alternatively, use `Plotter.plot_demand()`.
 
@@ -98,7 +98,26 @@ class DemandProfile:
         plt.plot_demand(routing, self, save_fig=save_fig)
         del plt
 
-    def add_vehicle_type(self, vehicle_type_id: str, vehicle_class: str="passenger", colour: str|list|tuple|None = None, length: int|float|None = None, width: int|float|None = None, height: int|float|None = None, max_speed: int|float|None = None, speed_factor: int|float|None = None, speed_dev: int|float|None = None, min_gap: int|float|None = None, max_acceleration: int|float|None = None, max_deceleration: int|float|None = None, headway: int|float|None = None, imperfection: int|float|None = None, max_lateral_speed: int|float|None = None, emission_class: str|None = None, gui_shape: str|None = None) -> None:
+    def add_vehicle_type(self,
+                         vehicle_type_id: str,
+                         vehicle_class: str="passenger",
+                         *,
+                         colour: str | list | tuple | None = None,
+                         length: int | float | None = None,
+                         width: int | float | None = None,
+                         height: int | float | None = None,
+                         max_speed: int | float | None = None,
+                         speed_factor: int | float | None = None,
+                         speed_dev: int | float | None = None,
+                         min_gap: int | float | None = None,
+                         max_acceleration: int | float | None = None,
+                         max_deceleration: int | float | None = None,
+                         headway: int | float | None = None,
+                         imperfection: int | float | None = None,
+                         max_lateral_speed: int | float | None = None,
+                         emission_class: str | None = None,
+                         gui_shape: str | None = None
+                        ) -> None:
         """
         Adds a new vehicle type to the simulation.
 
@@ -207,7 +226,8 @@ class DemandProfile:
 
     def load_demand(self, csv_file: str) -> None:
         """
-        Loads OD demand from a '_.csv_' file. The file must contain an 'origin/destination' or 'route_id' column(s), 'start_time/end_time' or 'start_step/end_step' columns(s) and a 'demand/number' column.
+        Loads OD demand from a '_.csv_' file. The file must contain an 'origin/destination' or 'route_id' column(s),
+        'start_time/end_time' or 'start_step/end_step' columns(s) and a 'demand/number' column.
         
         Args:
             `csv_file` (str): Demand file location
@@ -337,7 +357,9 @@ class DemandProfile:
                                 colour = row[demand_idxs["colour"]]
                             else: colour = None
 
-                            self.add_demand(routing, step_range, demand, vehicle_types, vehicle_type_dists, initial_speed, origin_lane, origin_pos, insertion_sd, colour)
+                            self.add_demand(routing=routing, step_range=step_range, demand=demand, vehicle_types=vehicle_types,
+                                            vehicle_type_dists=vehicle_type_dists, initial_speed=initial_speed, origin_lane=origin_lane,
+                                            origin_pos=origin_pos, insertion_sd=insertion_sd, colour=colour)
                             
             else:
                 desc = "Demand file '{0}' not found.".format(csv_file)
@@ -346,7 +368,19 @@ class DemandProfile:
             desc = "Invalid demand file '{0}' format (must be '.csv').".format(csv_file)
             raise_error(ValueError, desc)
 
-    def add_demand(self, routing: str|list|tuple, step_range: list|tuple, demand: int|float, vehicle_types: str|list|tuple|None = None, vehicle_type_dists: list|tuple|None = None, initial_speed: str|int|float = "max", origin_lane: str|int|float = "best", origin_pos: str|int = "base", insertion_sd: float = 0.333, colour: str|list|tuple|None = None) -> None:
+    def add_demand(self,
+                   routing: str | list | tuple,
+                   step_range: list | tuple,
+                   demand: int | float,
+                   *,
+                   vehicle_types: str | list | tuple | None = None,
+                   vehicle_type_dists: list | tuple | None = None,
+                   initial_speed: str | int | float = "max",
+                   origin_lane: str | int | float = "best",
+                   origin_pos: str | int = "base",
+                   insertion_sd: float = 0.333,
+                   colour: str | list | tuple | None = None
+                  ) -> None:
         """
         Adds traffic flow demand for a specific route and time.
         
@@ -354,11 +388,11 @@ class DemandProfile:
             `routing` (str, list, tuple): Either a route ID or OD pair of edge IDs
             `step_range` (str, list, tuple): (2x1) list or tuple denoting the start and end steps of the demand
             `demand` (int, float): Generated flow in vehicles/hour
-            `vehicle_types` (str, list, tuple, optional):List of vehicle type IDs
-            `vehicle_type_dists` (list, tuple, optional):Vehicle type distributions used when generating flow
-            `initial_speed` (str, int, float): Initial speed at insertion, either ['_max_'|'_random_'] or number > 0
-            `origin_lane` (str, int): Lane for insertion at origin, either ['_random_'|'_free_'|'_allowed_'|'_best_'|'_first_'] or lane index
-            `origin_pos` (str, int): Longitudinal position at insertion, either ['_random_'|'_free_'|'_random_free_'|'_base_'|'_last_'|'_stop_'|'_splitFront_'] or offset
+            `vehicle_types` (str, list, tuple, optional): List of vehicle type IDs
+            `vehicle_type_dists` (list, tuple, optional): Vehicle type distributions used when generating flow
+            `initial_speed` (str, int, float): Initial speed at insertion, either ['_max_' | '_random_'] or number > 0
+            `origin_lane` (str, int): Lane for insertion at origin, either ['_random_' | '_free_' | '_allowed_' | '_best_' | '_first_'] or lane index
+            `origin_pos` (str, int): Longitudinal position at insertion, either ['_random_' | '_free_' | '_random_free_' | '_base_' | '_last_' | '_stop_' | '_splitFront_'] or offset
             `insertion_sd` (float): Vehicle insertion number standard deviation, at each step
             `colour` (str, list, tuple, optional): Vehicle colour, either hex code, list of rgb/rgba values or valid SUMO colour string
         """
@@ -409,7 +443,20 @@ class DemandProfile:
             self._sim._manual_flow = True
         self._demand_arrs.append([routing, step_range, demand, vehicle_types, vehicle_type_dists, initial_speed, origin_lane, origin_pos, insertion_sd, colour])
 
-    def add_demand_function(self, routing: str|list|tuple, step_range: list|tuple, demand_function, parameters: dict|None = None, vehicle_types: str|list|tuple|None = None, vehicle_type_dists: list|tuple|None = None, initial_speed: str|int|float = "max", origin_lane: str|int|float = "best", origin_pos: str|int = "base", insertion_sd: float = 0.333, colour: str|list|tuple|None = None) -> None:
+    def add_demand_function(self,
+                            routing: str | list | tuple,
+                            step_range: list | tuple,
+                            demand_function,
+                            parameters: dict | None = None,
+                            *,
+                            vehicle_types: str | list | tuple | None = None,
+                            vehicle_type_dists: list | tuple | None = None,
+                            initial_speed: str | int | float = "max",
+                            origin_lane: str | int | float = "best",
+                            origin_pos: str | int = "base",
+                            insertion_sd: float = 0.333,
+                            colour: str | list | tuple | None = None
+                           ) -> None:
         """
         Adds traffic flow demand calculated for each step using a 'demand_function'. 'step' is the only required parameter of the function.
 
@@ -417,12 +464,12 @@ class DemandProfile:
             `routing` (str, list, tuple): Either a route ID or OD pair of edge IDs
             `step_range` (list, tuple): (2x1) list or tuple denoting the start and end steps of the demand
             `demand_function` (function): Function used to calculate flow (vehicles/hour)
-            `parameters` (dict, optional):Dictionary containing extra parameters for the demand function
+            `parameters` (dict, optional): Dictionary containing extra parameters for the demand function
             `vehicle_types` (str, list, tuple, optional): List of vehicle type IDs
             `vehicle_type_dists` (list, tuple, optional): Vehicle type distributions used when generating flow
-            `initial_speed` (str, int, float): Initial speed at insertion, either ['_max_'|'_random_'] or number > 0
-            `origin_lane` (str, int, float): Lane for insertion at origin, either ['_random_'|'_free_'|'_allowed_'|'_best_'|'_first_'] or lane index
-            `origin_pos` (str, int): Longitudinal position at insertion, either ['_random_'|'_free_'|'_random_free_'|'_base_'|'_last_'|'_stop_'|'_splitFront_'] or offset
+            `initial_speed` (str, int, float): Initial speed at insertion, either ['_max_' | '_random_'] or number > 0
+            `origin_lane` (str, int, float): Lane for insertion at origin, either ['_random_' | '_free_' | '_allowed_' | '_best_' | '_first_'] or lane index
+            `origin_pos` (str, int): Longitudinal position at insertion, either ['_random_' | '_free_' | '_random_free_' | '_base_' | '_last_' | '_stop_' | '_splitFront_'] or offset
             `insertion_sd` (float): Vehicle insertion number standard deviation, at each step
             `colour` (str, list, tuple, optional): Vehicle colour, either hex code, list of rgb/rgba values or valid SUMO colour string
         """
@@ -447,7 +494,9 @@ class DemandProfile:
             # Skip if equal to or less than 0
             if demand_val <= 0: continue
 
-            self.add_demand(routing, (step_no, step_no), demand_val, vehicle_types, vehicle_type_dists, initial_speed, origin_lane, origin_pos, insertion_sd, colour)
+            self.add_demand(routing=routing, step_range=(step_no, step_no), demand=demand_val, vehicle_types=vehicle_types,
+                            vehicle_type_dists=vehicle_type_dists, initial_speed=initial_speed, origin_lane=origin_lane,
+                            origin_pos=origin_pos, insertion_sd=insertion_sd, colour=colour)
 
     def remove_demand(self, start_step: int, end_step: int) -> None:
         """
