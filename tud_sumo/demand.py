@@ -98,7 +98,7 @@ class DemandProfile:
         plt.plot_demand(routing, self, save_fig=save_fig)
         del plt
 
-    def add_vehicle_type(self, vehicle_type_id: str, vehicle_class: str="passenger", colour: str|list|tuple|None = None, length: int|float|None = None, width: int|float|None = None, height: int|float|None = None, max_speed: int|float|None = None, speed_factor: int|float|None = None, speed_dev: int|float|None = None, min_gap: int|float|None = None, acceleration: int|float|None = None, deceleration: int|float|None = None, tau: int|float|None = None, max_lateral_speed: int|float|None = None, emission_class: str|None = None, gui_shape: str|None = None) -> None:
+    def add_vehicle_type(self, vehicle_type_id: str, vehicle_class: str="passenger", colour: str|list|tuple|None = None, length: int|float|None = None, width: int|float|None = None, height: int|float|None = None, max_speed: int|float|None = None, speed_factor: int|float|None = None, speed_dev: int|float|None = None, min_gap: int|float|None = None, max_acceleration: int|float|None = None, max_deceleration: int|float|None = None, headway: int|float|None = None, imperfection: int|float|None = None, max_lateral_speed: int|float|None = None, emission_class: str|None = None, gui_shape: str|None = None) -> None:
         """
         Adds a new vehicle type to the simulation.
 
@@ -113,9 +113,10 @@ class DemandProfile:
             `speed_factor` (int, float, optional): Vehicle speed multiplier
             `speed_dev` (int, float, optional): Vehicle deviation from speed factor
             `min_gap` (int, float, optional): Minimum gap behind leader
-            `acceleration` (int, float, optional): Maximum vehicle acceleration
-            `deceleration` (int, float, optional): Maximum vehicle deceleration
-            `tau` (int, float, optional): Vehicle car following parameter
+            `max_acceleration` (int, float, optional): Maximum vehicle acceleration
+            `max_deceleration` (int, float, optional): Maximum vehicle deceleration
+            `headway` (int, float, optional): Desired minimum time headway in seconds
+            `imperfection` (int, float, optional): Driver imperfection (0 denotes perfect driving)
             `max_lateral_speed` (int, float, optional): Maximum lateral speed when lane changing
             `emission_class` (str, optional): Vehicle emissions class ID
             `gui_shape` (str, optional): Vehicle shape in GUI (defaults to vehicle class name)
@@ -146,8 +147,8 @@ class DemandProfile:
         if len(self._vehicle_types) > 0:
 
             sumo_names = {'vehicle_class': 'vClass', 'colour': 'color', 'length': 'length', 'height': 'height', 'mass': 'mass',
-                          'speed_factor': 'speedFactor', 'speed_dev': 'speedDev', 'min_gap': 'minGap', 'acceleration': 'accel',
-                          'deceleration': 'decel', 'tau': 'tau', 'max_lateral_speed': 'maxSpeedLat',  'emission_class': "emissionClass",
+                          'speed_factor': 'speedFactor', 'speed_dev': 'speedDev', 'min_gap': 'minGap', 'max_acceleration': 'accel',
+                          'max_deceleration': 'decel', 'tau': 'tau', 'max_lateral_speed': 'maxSpeedLat',  'emission_class': "emissionClass",
                           'gui_shape': 'guiShape'}
 
             root.append(et.Comment(" VTypes "))

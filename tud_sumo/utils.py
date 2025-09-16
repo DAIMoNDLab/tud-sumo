@@ -35,6 +35,8 @@ valid_data_keys = { "detector": {
                         "headway":       {"getter": True,  "setter": True,  "tc": tc.VAR_TAU},
                         "imperfection":  {"getter": True,  "setter": True,  "tc": tc.VAR_IMPERFECTION},
                         "acceleration":  {"getter": True,  "setter": True,  "tc": tc.VAR_ACCELERATION},
+                        "max_acceleration": {"getter": True,  "setter": True,  "tc": tc.VAR_ACCEL},
+                        "max_deceleration": {"getter": True,  "setter": True,  "tc": tc.VAR_DECEL},
                         "position":      {"getter": True,  "setter": False, "tc": tc.VAR_POSITION},
                         "altitude":      {"getter": True,  "setter": False, "tc": tc.VAR_POSITION3D},
                         "heading":       {"getter": True,  "setter": False, "tc": tc.VAR_ANGLE},
@@ -55,7 +57,7 @@ valid_data_keys = { "detector": {
                         "next_edge_id":  {"getter": True,  "setter": False, "tc": None},
                     },
                     "vehicle_type": ["vehicle_class", "colour", "length", "width", "height", "max_speed", "speed_factor", "speed_dev", #"mass",
-                                     "min_gap", "acceleration", "deceleration", "headway", "imperfection", "max_lateral_speed",
+                                     "min_gap", "max_acceleration", "max_deceleration", "headway", "imperfection", "max_lateral_speed",
                                      "emission_class", "gui_shape"
                     ],
                     "geometry": {
@@ -530,7 +532,7 @@ def test_input_dict(input_dict, valid_params, dict_name="", required=None) -> st
         if not isinstance(item, valid_params[key]):
             if isinstance(valid_params[key], (list, tuple)):
                 type_str = "[{0}]".format("|".join([str(val.__name__) for val in valid_params[key]]))
-            else: type_str == valid_params[key].__name__
+            else: type_str = valid_params[key].__name__
             desc = "Invalid {0} type '{1}' (must be '{2}' not '{3}')".format(key, item, type_str, type(item).__name__)
             return (TypeError, desc)
         

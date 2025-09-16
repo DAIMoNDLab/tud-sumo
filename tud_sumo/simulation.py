@@ -92,10 +92,7 @@ class Simulation:
         self._gui_veh_tracking = {}
         self._recorder = None
 
-        self._weather_active = False
-        self._weather_base_params = {"lanes": {}, "vtypes": {}}
-        self._weather_activation_times = []
-        self._weather_deactivation_times = []
+        self._weather_events = set([])
 
         from .__init__ import __version__
         self._tuds_version = __version__
@@ -575,7 +572,7 @@ class Simulation:
             desc = "Cannot add flow manually (no demand profiles)."
             raise_warning(desc, self.curr_step)
 
-    def add_vehicle_type(self, vehicle_type_id: str, vehicle_class: str="passenger", colour: str|list|tuple|None = None, length: int|float|None = None, width: int|float|None = None, height: int|float|None = None, max_speed: int|float|None = None, speed_factor: int|float|None = None, speed_dev: int|float|None = None, min_gap: int|float|None = None, acceleration: int|float|None = None, deceleration: int|float|None = None, headway: int|float|None = None, max_lateral_speed: int|float|None = None, emission_class: str|None = None, gui_shape: str|None = None) -> None:
+    def add_vehicle_type(self, vehicle_type_id: str, vehicle_class: str="passenger", colour: str|list|tuple|None = None, length: int|float|None = None, width: int|float|None = None, height: int|float|None = None, max_speed: int|float|None = None, speed_factor: int|float|None = None, speed_dev: int|float|None = None, min_gap: int|float|None = None, max_acceleration: int|float|None = None, max_deceleration: int|float|None = None, headway: int|float|None = None, imperfection: int|float|None = None, max_lateral_speed: int|float|None = None, emission_class: str|None = None, gui_shape: str|None = None) -> None:
         """
         Adds a new vehicle type to the simulation.
 
@@ -590,9 +587,10 @@ class Simulation:
             `speed_factor` (int, float, optional): Vehicle speed multiplier
             `speed_dev` (int, float, optional): Vehicle deviation from speed factor
             `min_gap` (int, float, optional): Minimum gap behind leader
-            `acceleration` (int, float, optional): Maximum vehicle acceleration
-            `deceleration` (int, float, optional): Maximum vehicle deceleration
-            `headway` (int, float, optional): Vehicle car following parameter
+            `max_acceleration` (int, float, optional): Maximum vehicle acceleration
+            `max_deceleration` (int, float, optional): Maximum vehicle deceleration
+            `headway` (int, float, optional): Desired minimum time headway in seconds
+            `imperfection` (int, float, optional): Driver imperfection (0 denotes perfect driving)
             `max_lateral_speed` (int, float, optional): Maximum lateral speed when lane changing
             `emission_class` (str, optional): Vehicle emissions class ID
             `gui_shape` (str, optional): Vehicle shape in GUI (defaults to vehicle class name)
@@ -610,9 +608,9 @@ class Simulation:
         self.set_vehicle_type_vals(vehicle_type_id, vehicle_class=vehicle_class, colour=colour,
                                    length=length, width=width, height=height, max_speed=max_speed,
                                    speed_factor=speed_factor, speed_dev=speed_dev, min_gap=min_gap,
-                                   acceleration=acceleration, deceleration=deceleration, headway=headway,
-                                   max_lateral_speed=max_lateral_speed, emission_class=emission_class,
-                                   gui_shape=gui_shape)
+                                   max_acceleration=max_acceleration, max_deceleration=max_deceleration,
+                                   headway=headway, imperfection=imperfection, max_lateral_speed=max_lateral_speed,
+                                   emission_class=emission_class, gui_shape=gui_shape)
 
     def add_tracked_junctions(self, junctions: str|list|tuple|dict|None = None) -> dict:
         """
@@ -2284,84 +2282,82 @@ class Simulation:
         self.add_events({incident_id: event_dict})
         return True
     
-    def add_weather_effects(self, strength: float = 0.2, *, headway_increase: int|float|None = None, imperfection_increase: int|float|None = None, acceleration_reduction: int|float|None = None, speed_f_reduction: float|int|None = None, max_speed_reduction: int|float|None = None, min_lane_speed: int|float = 30, speed_reduction_scale: int|float = 0.03) -> None:
+    def add_weather(self, duration: int|float, strength: float = 0.2, locations: list|tuple|None = None, *, weather_id: str|None = None, headway_increase: int|float|None = None, imperfection_increase: int|float|None = None, acceleration_reduction: int|float|None = None, speed_f_reduction: float|int|None = None) -> str:
         """
-        Simulates weather effects by reducing headway (tau), vehicle acceleration/deceleration/speed factor and
-        lane speeds and by increasing driver imperfection (sigma). All effects can be set using the strength
-        parameter, or defined individually.
+        Starts simulating weather effects in the next time step. Both desired time headway and driver imperfection
+        are increased, whilst acceleration/deceleration and driver speed factor are reduced. The increase/reduction
+        can either be defined individually or using the `strength` parameter, which is otherwise used as the default
+        increase/reduction.
+
+        Weather can be localised by setting `locations` to a list of geometry IDs, or can be made network-wide by
+        omitting `locations`.
 
         Args:
+            `duration` (int, float): Duration of active weather effects
             `strength` (float): Used as the default reduction/increase value when not given (defaults to 0.2)
+            `locations` (list, tuple, optional): List of edge/lane IDs where effects will be active (defaults to network-wide effects)
+            `weather_id` (str, optional): Event ID (defaults to 'weather_x', where x is the )
             `headway_increase` (int, float, optional): Percent increase to vehicle type desired time headway (tau)
             `imperfection_increase` (int, float, optional): Percent increase to vehicle type imperfection value (sigma)
             `acceleration_reduction` (int, float, optional): Percent reduction to vehicle type maximum acceleration/deceleration
             `speed_f_reduction` (int, float, optional): Percent reduction to vehicle type speed factor, used to calculate vehicle speed based on speed limit
-            `max_speed_reduction` (int, float, optional): Maximum percent reduction to lane speed limits
-            `min_lane_speed` (int, float): Minimum lane speed limit to apply reduction (defaults to 30km/h)
-            `speed_reduction_scale` (int, float): Speed reduction drop off (defaults to 0.03)
+
+        Returns:
+            str: Weather event ID
         """
 
-        headway_increase = strength if headway_increase == None else headway_increase
-        imperfection_increase = strength if imperfection_increase == None else imperfection_increase
-        acceleration_reduction = strength if acceleration_reduction == None else acceleration_reduction
-        speed_f_reduction = strength if speed_f_reduction == None else speed_f_reduction
-        max_speed_reduction = strength if max_speed_reduction == None else max_speed_reduction
+        # internal lanes?
 
-        for vtype in self.get_vehicle_types():
-            vtype_data = self.get_vehicle_type_vals(vtype, ["headway", "imperfection", "acceleration", "deceleration", "speed_factor"])
-            headway, imperfection = vtype_data["headway"], vtype_data["imperfection"]
-            accel, decel = vtype_data["acceleration"], vtype_data["deceleration"]
-            speedf = vtype_data["speed_factor"]
-            self.set_vehicle_type_vals(vtype, headway=headway*(1+headway_increase),
-                                       imperfection=min(1, max(0, imperfection*(1+imperfection_increase))),
-                                       acceleration=max(0, accel*(1-acceleration_reduction)),
-                                       deceleration=max(0, decel*(1-acceleration_reduction)),
-                                       speed_factor=speedf*(1-speed_f_reduction))
-            
-            self._weather_base_params["vtypes"][vtype] = (headway, imperfection, accel, decel, speedf)
+        if locations != None and isinstance(locations, (list, tuple)):
+            for edge in locations:
+                if self.geometry_exists(edge) == None:
+                    desc = f"Unrecognised geometry ID '{edge}'."
+                    raise_error(KeyError, desc, self.curr_step)
+        else: locations = self._all_edges
 
-        for lane_id in self.get_geometry_ids("lane"):
-            curr_speed = self.get_geometry_vals(lane_id, "max_speed")
+        if weather_id == None: weather_id = f"weather_{len(self._weather_events) + 1}"
+        if weather_id in self._weather_events:
+            desc = f"Invalid weather event ID '{weather_id}' (already exists)."
+            raise_error(KeyError, desc, self.curr_step)
 
-            if curr_speed > min_lane_speed:
-                reduction = max_speed_reduction * (1 - math.exp(-speed_reduction_scale * (curr_speed - min_lane_speed)))
-                self.set_geometry_vals(lane_id, max_speed=curr_speed * (1 - reduction))
-                self._weather_base_params["lanes"][lane_id] = curr_speed
+        w_effects = {}
+        w_effects["headway"] = 1 + strength if headway_increase == None else 1 + headway_increase
+        w_effects["imperfection"] = 1 + strength if imperfection_increase == None else 1 + imperfection_increase
+        w_effects["max_acceleration"] = 1 - strength if acceleration_reduction == None else 1 - acceleration_reduction
+        w_effects["max_deceleration"] = 1 - strength if acceleration_reduction == None else 1 - acceleration_reduction
+        w_effects["speed_factor"] = 1 - strength if speed_f_reduction == None else 1 - speed_f_reduction
 
-        self._weather_active = True
-        if self.curr_step not in self._weather_activation_times:
-            self._weather_activation_times.append(self.curr_step)
+        w_effects = {key: val for key, val in w_effects.items() if val != 1}
 
-    def remove_weather_effects(self, vehicle_types: bool = True, lanes: bool = True) -> None:
-        """
-        Removes vehicle type and/or lane weather effects, resetting parameters to those from when
-        weather effects were last changed/added.
+        if len(w_effects) == 0:
+            desc = "Could not add weather effects (no changes set - increase strength)."
+            raise_error(ValueError, desc, self.curr_step)
 
-        Args:
-            `vehicle_types` (bool): Denotes whether to remove effects on vehicles
-            `lanes` (bool): Denotes whether to remove effects on lanes
-        """
+        event_dict = {weather_id: {
+                        "start_step": self.curr_step + 1,
+                        "end_step": self.curr_step + ((duration + 1) / self.step_length),
+                        "vehicles": {
+                            "locations": locations,
+                            "actions": w_effects,
+                            "effect_probability": 1,
+                            "remove_affected_vehicles": False,
+                            "r_effects": True,
+                            "location_only": True,
+                            "force_end": True
+                            }
+                        }}
+        
+        self.add_events(event_dict)
+        self._weather_events.add(weather_id)
+        return weather_id
 
-        if vehicle_types:
-            for vtype, (orig_hdwy, orig_imperf, orig_accel, orig_decel, orig_speedf) in self._weather_base_params["vtypes"].items():
-                self.set_vehicle_type_vals(vtype, headway=orig_hdwy, imperfection=orig_imperf,
-                                           acceleration=orig_accel, deceleration=orig_decel,
-                                           speed_factor=orig_speedf)
-
-        if lanes:
-            for lane_id, orig_speed in self._weather_base_params["lanes"].items():
-                self.set_geometry_vals(lane_id, max_speed=orig_speed)
-
-        if vehicle_types and lanes:
-            self._weather_active = False
-            if self.curr_step not in self._weather_deactivation_times:
-                self._weather_deactivation_times.append(self.curr_step)
-                # Use activation/deactivation times to add to plots, as events or individually
-
-    def is_weather_active(self) -> bool:
-        """ Returns whether lane or vehicle type weather effects are currently active. """
-
-        return self._weather_active
+    def get_active_weather(self) -> tuple:
+        
+        if self._scheduler != None:
+            active_events = self._scheduler.get_event_ids("active")
+            return (e_id for e_id in active_events if e_id in self._weather_events)
+        
+        else: return ()
 
     def vehicle_exists(self, vehicle_id: str) -> bool:
         """
@@ -2626,6 +2622,8 @@ class Simulation:
             `headway` (int, float): Desired minimum time headway in seconds
             `imperfection` (int, float): Driver imperfection (0 denotes perfect driving)
             `acceleration` ((int, float, optional), (int, float)): Set acceleration for a given duration 
+            `max_acceleration` (int, float, optional): Set maximum allowed acceleration
+            `max_deceleration` (int, float, optional): Set maximum allowed deceleration
             `lane_idx` (int, (int, float), optional): Try and change lane for a given duration
             `destination` (str, optional): Set vehicle destination edge ID
             `route_id` (str, optional): Set vehicle route by route ID or list of edges
@@ -2732,6 +2730,26 @@ class Simulation:
                             desc = "({0}): '{0}' requires 2 parameters (acceleration [int|float], duration [int|float])".format(command)
                             raise_error(TypeError, desc, self.curr_step)
 
+                    case "max_acceleration":
+                        if isinstance(value, (int, float)):
+                            if value < 0:
+                                desc = f"({command}): Invalid max_acceleration value '{value}' (must be >= 0)."
+                                raise_error(ValueError, desc, self.curr_step)
+                            traci.vehicle.setAccel(vehicle_id, value)
+                        else:
+                            desc = f"({command}): Invalid max_acceleration value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            raise_error(TypeError, desc, self.curr_step)
+
+                    case "max_deceleration":
+                        if isinstance(value, (int, float)):
+                            if value < 0:
+                                desc = f"({command}): Invalid max_deceleration value '{value}' (must be >= 0)."
+                                raise_error(ValueError, desc, self.curr_step)
+                            traci.vehicle.setDecel(vehicle_id, value)
+                        else:
+                            desc = f"({command}): Invalid max_deceleration value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            raise_error(TypeError, desc, self.curr_step)
+
                     case "lane_idx":
                         if isinstance(value, (list, tuple)) and len(value) == 2:
                             if not isinstance(value[0], int):
@@ -2820,8 +2838,8 @@ class Simulation:
             `speed_factor` (int, float): Vehicle speed multiplier
             `speed_dev` (int, float): Vehicle deviation from speed factor
             `min_gap` (int, float): Minimum gap behind leader
-            `acceleration` (int, float): Maximum vehicle acceleration
-            `deceleration` (int, float): Maximum vehicle deceleration
+            `max_acceleration` (int, float): Maximum vehicle acceleration
+            `max_deceleration` (int, float): Maximum vehicle deceleration
             `headway` (int, float): Desired minimum time headway in seconds
             `imperfection` (int, float): Driver imperfection (0 denotes perfect driving)
             `max_lateral_speed` (int, float): Maximum lateral speed when lane changing
@@ -2925,24 +2943,24 @@ class Simulation:
                             desc = f"({command}): Invalid speed_dev value '{value}' (must be [int|float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
-                    case "acceleration":
+                    case "max_acceleration":
                         if isinstance(value, (int, float)):
                             if value < 0:
-                                desc = f"({command}): Invalid acceleration value '{value}' (must be >= 0)."
+                                desc = f"({command}): Invalid max_acceleration value '{value}' (must be >= 0)."
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicletype.setAccel(vehicle_type, value)
                         else:
-                            desc = f"({command}): Invalid acceleration value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid max_acceleration value '{value}' (must be [int|float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
-                    case "deceleration":
+                    case "max_deceleration":
                         if isinstance(value, (int, float)):
                             if value < 0:
-                                desc = f"({command}): Invalid deceleration value '{value}' (must be >= 0)."
+                                desc = f"({command}): Invalid max_deceleration value '{value}' (must be >= 0)."
                                 raise_error(ValueError, desc, self.curr_step)
                             traci.vehicletype.setDecel(vehicle_type, value)
                         else:
-                            desc = f"({command}): Invalid deceleration value '{value}' (must be [int|float], not '{type(value).__name__}')."
+                            desc = f"({command}): Invalid max_deceleration value '{value}' (must be [int|float], not '{type(value).__name__}')."
                             raise_error(TypeError, desc, self.curr_step)
 
                     case "headway":
@@ -2993,7 +3011,7 @@ class Simulation:
         """
         Get data values for specific vehicle type(s) using a list of data keys. Valid data keys are;
         '_vehicle_class_', '_colour_', '_length_', '_width_', '_height_', '_headway_', '_imperfection_', '_mass_',
-        '_max_speed_', '_speed_factor_', '_speed_dev_', '_min_gap_', '_acceleration_', '_deceleration_',
+        '_max_speed_', '_speed_factor_', '_speed_dev_', '_min_gap_', '_max_acceleration_', '_max_deceleration_',
         '_max_lateral_speed_', '_emission_class_', '_gui_shape_'
         
         Args:
@@ -3064,10 +3082,10 @@ class Simulation:
                     case "speed_dev":
                         data_vals[data_key] = traci.vehicletype.getSpeedDeviation(vehicle_type)
 
-                    case "acceleration":
+                    case "max_acceleration":
                         data_vals[data_key] = traci.vehicletype.getAccel(vehicle_type)
 
-                    case "deceleration":
+                    case "max_deceleration":
                         data_vals[data_key] = traci.vehicletype.getDecel(vehicle_type)
 
                     case "headway":
@@ -3394,8 +3412,9 @@ class Simulation:
 
         **Vehicle Status**:
         '_speed_', '_is_stopped_', '_max_speed_', '_allowed_speed_', '_speed_factor_', '_headway_', '_imperfection_',
-        '_acceleration_', '_position_', '_altitude_', '_heading_', '_edge_id_', '_lane_id_', '_lane_idx_', '_route_id_',
-        '_route_idx_', '_route_edges_', '_next_edge_id_', '_leader_id_', '_leader_dist_'
+        '_acceleration_', '_max_acceleration_', '_max_deceleration_', '_position_', '_altitude_', '_heading_',
+        '_edge_id_', '_lane_id_', '_lane_idx_', '_route_id_', '_route_idx_', '_route_edges_', '_next_edge_id_',
+        '_leader_id_', '_leader_dist_'
 
         **Trip Data**:
         '_departure_', '_origin_', '_destination_'
@@ -3498,6 +3517,16 @@ class Simulation:
                         if subscription_key in subscribed_data: acceleration = subscribed_data[subscription_key]
                         else: acceleration = traci.vehicle.getAcceleration(vehicle_id)
                         data_vals[data_key] = acceleration
+
+                    case "max_acceleration":
+                        if subscription_key in subscribed_data: max_acceleration = subscribed_data[subscription_key]
+                        else: max_acceleration = traci.vehicle.getAccel(vehicle_id)
+                        data_vals[data_key] = max_acceleration
+
+                    case "max_deceleration":
+                        if subscription_key in subscribed_data: max_deceleration = subscribed_data[subscription_key]
+                        else: max_deceleration = traci.vehicle.getDecel(vehicle_id)
+                        data_vals[data_key] = max_deceleration
 
                     case "position":
                         if subscription_key in subscribed_data: position = list(subscribed_data[subscription_key])
@@ -3704,6 +3733,7 @@ class Simulation:
         all_vehicle_data = {}
         total_vehicle_data = {"no_vehicles": 0, "no_waiting": 0, "delay": 0}
         lane_speeds, allowed_speeds = {}, {}
+        #vtype_sf, lane_speed_lims = {}, {}
 
         for vehicle_id in self._all_curr_vehicle_ids:
 
@@ -3720,6 +3750,16 @@ class Simulation:
                 if vehicle_data["is_stopped"]: total_vehicle_data["no_waiting"] += 1
 
                 lane_id, speed, allowed_speed = vehicle_data["lane_id"], vehicle_data["speed"], vehicle_data["allowed_speed"]
+                
+                #if "orig" in sys.argv: allowed_speed = vehicle_data["allowed_speed"]
+                #else:
+                #    if v_type in vtype_sf: speed_factor = vtype_sf[v_type]
+                #    else: speed_factor = self.get_vehicle_type_vals(v_type, "speed_factor")
+
+                #    if lane_id in lane_speed_lims: speed_limit = lane_speed_lims[lane_id]
+                #    else: speed_limit = self.get_geometry_vals(lane_id, "max_speed")
+
+                #    allowed_speed = min(max_speed, speed_factor * speed_limit)
 
                 # Vehicle is on an internal edge (in an intersection) - set to its last non-internal lane
                 while lane_id.startswith(':'): lane_id = self._network.getLane(lane_id).getIncoming()[0].getID()
@@ -4207,6 +4247,40 @@ class Simulation:
 
         if self._scheduler == None: return None
         else: return self._scheduler.get_event_status(event_id)
+
+    def get_event(self, event_id: str) -> Event:
+        """
+        Get event object by its ID.
+
+        Args:
+            `event_id` (str): Event ID
+        
+        Returns:
+            Event: Event object
+        """
+        return self._scheduler.get_event(event_id)
+    
+    def remove_events(self, event_ids: str|list|tuple|None = None) -> None:
+        """
+        Remove event(s) from the simulation. Scheduled and completed events are deleted
+        from the event scheduler, whilst active events are terminated early. Defaults
+        to removing **_all currently active_** events.
+
+        Args:
+            `event_ids` (str, list, tuple, optional): List of event IDs
+        """
+        
+        all_events = self._scheduler.get_event_ids()
+
+        if isinstance(event_ids, str): event_ids = [event_ids]
+        if event_ids == None: event_ids = self._scheduler.get_event_ids("active")
+
+        if len(event_ids) > 0:
+            for event_id in event_ids:
+                if event_id in all_events: self._scheduler.remove_event(event_id)
+        else:
+            desc = "Invalid event_ids '[]' (given empty list)."
+            raise_error(ValueError, desc, self.curr_step)
 
     def controller_exists(self, controller_id: str) -> str|None:
         """

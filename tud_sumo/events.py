@@ -81,6 +81,31 @@ class EventScheduler:
 
         return events
     
+    def get_event(self, event_id):
+
+        if event_id in self.scheduled_events:
+            return self.scheduled_events[event_id]
+        elif event_id in self.active_events:
+            return self.active_events[event_id]
+        elif event_id in self.completed_events:
+            return self.completed_events[event_id]
+        else:
+            desc = f"Unrecognised event ID '{event_id}'."
+            raise_error(KeyError, desc, self.sim.curr_step)
+
+    def remove_event(self, event_id):
+
+        if event_id in self.scheduled_events:
+            del self.scheduled_events[event_id]
+        elif event_id in self.active_events:
+            event = self.get_event(event_id)
+            event.terminate()
+        elif event_id in self.completed_events:
+            del self.completed_events[event_id]
+        else:
+            desc = f"Unrecognised event ID '{event_id}'."
+            raise_error(KeyError, desc, self.sim.curr_step)
+    
     def add_events(self, events) -> None:
         """
         Add events to the schedule.
@@ -216,12 +241,16 @@ class Event:
         
         if "edges" in event_params.keys():
             edge_params = event_params["edges"]
-            valid_params = {"actions": dict, "edge_ids": (list, tuple)}
-            error, desc = test_input_dict(edge_params, valid_params, dict_name="edge", required=True)
+            valid_params = {"actions": dict, "edge_ids": (list, tuple), "r_effects": bool}
+            error, desc = test_input_dict(edge_params, valid_params, dict_name="edge", required=["actions", "edge_ids"])
             if error != None: raise_error(error, desc, self.sim.curr_step)
                                           
             self.edge_ids = edge_params["edge_ids"]
             self.e_actions, self.e_base = edge_params["actions"], {}
+
+            if "r_effects" in edge_params:
+                self.e_r_effects = edge_params["r_effects"]
+            else: self.e_r_effects = False
 
         else: self.e_actions = None
 
@@ -229,7 +258,8 @@ class Event:
             veh_params = event_params["vehicles"]
             valid_params = {"actions": dict, "locations": (list, tuple), "vehicle_ids": (list, tuple), "effect_duration": (int, float),
                             "vehicle_types": (list, tuple), "effect_probability": (int, float), "vehicle_limit": int, "highlight": bool,
-                            "remove_affected_vehicles": bool, "speed_safety_checks": bool, "lc_safety_checks": bool}
+                            "remove_affected_vehicles": bool, "speed_safety_checks": bool, "lc_safety_checks": bool, "r_effects": bool,
+                            "location_only": bool, "force_end": bool}
             
             error, desc = test_input_dict(veh_params, valid_params, "vehicle")
             if error != None: raise_error(error, desc, self.sim.curr_step)
@@ -251,6 +281,7 @@ class Event:
             else: self.vehicle_types = None
 
             self.v_prob = 1 if "effect_probability" not in veh_params.keys() else veh_params["effect_probability"]
+            self.ignored_vehs = []
             
             if "vehicle_limit" in veh_params.keys():
                 self.vehicle_limit, self.total_affected_vehicles = veh_params["vehicle_limit"], 0
@@ -274,6 +305,18 @@ class Event:
             for data_key in ["acceleration", "lane_idx"]:
                 if data_key in self.v_actions.keys():
                     self.v_actions[data_key] = (self.v_actions[data_key], self.v_effect_dur)
+
+            if "r_effects" in veh_params:
+                self.v_r_effects = veh_params["r_effects"]
+            else: self.v_r_effects = False
+
+            if "location_only" in veh_params:
+                self.location_only = veh_params["location_only"]
+            else: self.location_only = False
+
+            if "force_end" in veh_params:
+                self.force_end = veh_params["force_end"]
+            else: self.force_end = False
 
         else: self.v_actions = None
 
@@ -305,7 +348,11 @@ class Event:
                 else:
                     self.e_base[edge_id] = base_vals
 
-                self.sim.set_geometry_vals(edge_id, **self.e_actions)
+                if self.e_r_effects: action_dict = {a_key: self.e_base[edge_id][a_key] * self.e_actions[a_key] if isinstance(self.e_actions[a_key], (int, float)) else self.e_actions[a_key] for a_key in self.e_actions.keys()}
+                else: action_dict = self.e_actions
+
+                self.sim.set_geometry_vals(edge_id, **action_dict)
+
                 self.e_effects_active = True
                 if "allowed" in self.e_base[edge_id].keys():
                     self.e_base[edge_id]["disallowed"] = self.e_actions["allowed"]
@@ -320,6 +367,7 @@ class Event:
     def run(self):
         """ Implement any event effects. """
 
+        # Reset affected edges
         if self.e_actions != None:
             if self.end_time <= self.sim.curr_step and self.e_effects_active:
                 for edge_id in self.edge_ids:
@@ -351,7 +399,13 @@ class Event:
                     raise_error(KeyError, desc, self.sim.curr_step)
 
                 for vehicle_id in new_vehicles:
-                    if self.total_affected_vehicles < self.vehicle_limit and random() < self.v_prob:
+                    if self.total_affected_vehicles < self.vehicle_limit and vehicle_id not in self.ignored_vehs:
+
+                        # Vehicle will be permanently ignored according to the effect probability
+                        if random() > self.v_prob:
+                            self.ignored_vehs.append(vehicle_id)
+                            continue
+
                         base_vals = self.sim.get_vehicle_vals(vehicle_id, list(self.v_actions.keys()))
                         if len(list(self.v_actions.keys())) == 1:
                             action_key = list(self.v_actions.keys())[0]
@@ -361,8 +415,13 @@ class Event:
                             self.v_base[vehicle_id] = base_vals
 
                         if "speed" in self.v_base[vehicle_id].keys(): self.v_base[vehicle_id]["speed"] = -1
-                        self.sim.set_vehicle_vals(vehicle_id, **self.v_actions)
 
+                        # If using relative effects (r_effects == True), the values in self.v_actions are
+                        # used as the relative change to each variable (ie. 0.8 will result in 20% reduction)
+                        if self.v_r_effects: action_dict = {a_key: self.v_base[vehicle_id][a_key] * self.v_actions[a_key] if isinstance(self.v_actions[a_key], (int, float)) else self.v_actions[a_key] for a_key in self.v_actions.keys()}
+                        else: action_dict = self.v_actions
+
+                        self.sim.set_vehicle_vals(vehicle_id, **action_dict)
                         # If self.v_effect_dur is a number, this is used as effect duration, else if it is "EVENT",
                         # all vehicle effects will be stopped once the event is over.
                         if isinstance(self.v_effect_dur, str) and self.v_effect_dur.upper() == "EVENT":
@@ -380,30 +439,37 @@ class Event:
 
             affected_vehicles_ids = list(self.affected_vehicles.keys())
             for vehicle_id in affected_vehicles_ids:
+                remove_effects = False
                 if not self.sim.vehicle_exists(vehicle_id):
                     del self.affected_vehicles[vehicle_id]
                     continue
                 
-                elif self.affected_vehicles[vehicle_id]["end_effect"] <= self.sim.curr_step:
-                    
-                    if "acceleration" in self.v_base[vehicle_id].keys():
-                        del self.v_base[vehicle_id]["acceleration"]
-                    if "lane_idx" in self.v_base[vehicle_id].keys():
-                        del self.v_base[vehicle_id]["lane_idx"]
-                    if self.highlight != None:
-                        self.v_base[vehicle_id]["highlight"] = None
+                elif self.affected_vehicles[vehicle_id]["end_effect"] <= self.sim.curr_step: remove_effects = True
 
-                    self.sim.set_vehicle_vals(vehicle_id, **self.v_base[vehicle_id])
-                    if not self.assert_speed_safety: self.sim.set_vehicle_vals(vehicle_id, speed_safety_checks=True)
-                    if not self.assert_lc_safety: self.sim.set_vehicle_vals(vehicle_id, lc_safety_checks=True)
+                elif self.location_only:
+                    l = self.sim.get_vehicle_vals(vehicle_id, ["edge_id", "lane_id"])
+                    if l["edge_id"] not in self.locations and l["lane_id"] not in self.locations: remove_effects = True
 
-                    del self.affected_vehicles[vehicle_id]
+                if self.force_end and self.sim.curr_step > self.end_time: remove_effects = True
 
-                    if len(self.affected_vehicles.keys()) == 0 and self.end_time <= self.sim.curr_step:
-                        self.v_effects_active = False
+                if remove_effects: self._remove_v_effects(vehicle_id)
 
-                    if self.remove_affected_vehicles:
-                        self.sim.remove_vehicles(vehicle_id)
+    def terminate(self):
+        """ Terminate active event before scheduled end, removing any vehicle/edge effects. """
+
+        if self.e_effects_active or self.v_effects_active:
+            self.end_time = self.sim.curr_step
+
+            for vehicle_id in list(self.affected_vehicles.keys()):
+                self._remove_v_effects(vehicle_id)
+
+            if self.e_actions != None:
+                for edge_id in self.edge_ids:
+                    self.sim.set_geometry_vals(edge_id, **self.e_base[edge_id])
+                self.e_effects_active = False
+
+            self.e_effects_active = False
+            self.v_effects_active = False
 
     def is_active(self):
         """
@@ -413,3 +479,24 @@ class Event:
             bool: Denotes whether the event is active
         """
         return self.e_effects_active or self.v_effects_active
+    
+    def _remove_v_effects(self, vehicle_id):
+                        
+        if "acceleration" in self.v_base[vehicle_id].keys():
+            del self.v_base[vehicle_id]["acceleration"]
+        if "lane_idx" in self.v_base[vehicle_id].keys():
+            del self.v_base[vehicle_id]["lane_idx"]
+        if self.highlight != None:
+            self.v_base[vehicle_id]["highlight"] = None
+
+        self.sim.set_vehicle_vals(vehicle_id, **self.v_base[vehicle_id])
+        if not self.assert_speed_safety: self.sim.set_vehicle_vals(vehicle_id, speed_safety_checks=True)
+        if not self.assert_lc_safety: self.sim.set_vehicle_vals(vehicle_id, lc_safety_checks=True)
+
+        del self.affected_vehicles[vehicle_id]
+
+        if len(self.affected_vehicles.keys()) == 0 and self.end_time <= self.sim.curr_step:
+            self.v_effects_active = False
+
+        if self.remove_affected_vehicles:
+            self.sim.remove_vehicles(vehicle_id)

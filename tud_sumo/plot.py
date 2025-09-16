@@ -207,14 +207,16 @@ class _GenericPlotter():
                     _, y_lim = ax.get_xlim(), ax.get_ylim()
                     for event_id in event_ids:
 
+                        if "weather" in event_id: e_colour = self.LICHTGROEN
+                        else: e_colour = self.ROOD
                         event = self.sim_data["data"]["events"][statuses[event_id]][event_id]
                         event_start, event_end = convert_units([event["start_time"], event["end_time"]], "steps", self.time_unit, self.sim_data["step_len"])
-                        ax.axvspan(event_start, event_end, color="red", zorder=1, alpha=0.2)
+                        ax.axvspan(event_start, event_end, color=e_colour, zorder=1, alpha=0.2)
 
-                        ax.axvline(event_start, color="red", alpha=0.4, linestyle='--')
-                        ax.axvline(event_end, color="red", alpha=0.4, linestyle='--')
+                        ax.axvline(event_start, color=e_colour, alpha=0.4, linestyle='--')
+                        ax.axvline(event_end, color=e_colour, alpha=0.4, linestyle='--')
 
-                        ax.text(event_start + ((event_end - event_start)/2), y_lim[1] * 0.9, event_id, horizontalalignment='center', color="red", zorder=10)
+                        ax.text(event_start + ((event_end - event_start)/2), y_lim[1] * 0.9, event_id, horizontalalignment='center', color=e_colour, zorder=10)
 
 class Plotter(_GenericPlotter):
     """ Visualisation class that plots TUD-SUMO data for one simulation. """
