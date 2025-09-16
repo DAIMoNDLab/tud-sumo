@@ -15,7 +15,7 @@ from .utils import *
 
 class _GenericPlotter():
 
-    def __init__(self, units: str="METRIC", time_unit: str="seconds", save_fig_loc: str="", save_fig_dpi: int=600, overwrite_figs: bool=True):
+    def __init__(self, units: str="METRIC", time_unit: str="seconds", stylesheet: str="seaborn-v0_8-whitegrid", save_fig_loc: str="", save_fig_dpi: int=600, overwrite_figs: bool=True):
 
         self._default_labels = {"no_vehicles": "No. of Vehicles", "no_waiting": "No. of Waiting Vehicles", "tts": "Total Time Spent (s)", "twt": "Total Waiting Time (s)", "avg_wt": "Waiting Time (s)",
                                 "delay": "Delay (veh s)", "avg_delay": "Delay (s)", "throughput": "Throughput (veh/hr)", "vehicle_counts": "No. of Vehicles", "flows": "Flow (vehicles/hour)",
@@ -55,6 +55,7 @@ class _GenericPlotter():
         self._default_labels["speed"] = speed
         self._default_labels["limits"] = limit
 
+        print(save_fig_loc)
         self.save_fig_loc, self.overwrite_figs = save_fig_loc, overwrite_figs
         if self.save_fig_loc != "":
             if not self.save_fig_loc.endswith('/'): self.save_fig_loc += "/"
@@ -86,6 +87,9 @@ class _GenericPlotter():
         self._default_colour_idx = 0
         self._default_colour = self.line_colours[self._default_colour_idx]
         self._next_colour_idx = 0
+
+        self.stylesheet = stylesheet
+        plt.style.use(self.stylesheet)
 
     def _display_figure(self, filename: str|None=None) -> None:
         """
@@ -221,12 +225,13 @@ class _GenericPlotter():
 class Plotter(_GenericPlotter):
     """ Visualisation class that plots TUD-SUMO data for one simulation. """
 
-    def __init__(self, simulation: Simulation|str, sim_label: str|None=None, time_unit: str="seconds", save_fig_loc: str="", save_fig_dpi: int=600, overwrite_figs: bool=True) -> None:
+    def __init__(self, simulation: Simulation|str, sim_label: str|None=None, time_unit: str="seconds", stylesheet: str="seaborn-v0_8-whitegrid", save_fig_loc: str="", save_fig_dpi: int=600, overwrite_figs: bool=True) -> None:
         """
         Args:
             `simulation` (Simulation, str): Either simulation object, sim_data dict or sim_data filepath
             `sim_label` (str, optional): Simulation or scenario label added to the beginning of all plot titles (set to 'scenario' for scenario name)
             `time_unit` (str): Plotting time unit used for all plots (must be ['_steps_'|'_seconds_'|'_minutes_'|'_hours_'])
+            `stylesheet` (str): Matplotlib stylesheet (defaults to 'seaborn-v0_8-whitegrid')
             `save_fig_loc` (str): Figure filepath when saving (defaults to current file)
             `save_fig_dpi` (int): Figure dpi when saving (defaults to 600dpi)
             `overwrite_figs` (bool): Denotes whether to allow overwriting of saved figures with the same name
@@ -266,7 +271,11 @@ class Plotter(_GenericPlotter):
         elif sim_label != None: self.sim_label = sim_label + ": "
         else: self.sim_label = ""
 
-        super().__init__(units, time_unit, save_fig_loc, save_fig_dpi, overwrite_figs)
+        self.stylesheet = stylesheet
+
+        super().__init__(units=units, time_unit=time_unit, stylesheet=stylesheet,
+                         save_fig_loc=save_fig_loc, save_fig_dpi=save_fig_dpi,
+                         overwrite_figs=overwrite_figs)
 
     def __str__(self): return "<{0}>".format(self.__name__)
     def __name__(self): return "Plotter"
@@ -381,7 +390,7 @@ class Plotter(_GenericPlotter):
                 desc = "No traffic light at junction '{0}'.".format(tl_id)
                 raise_error(ValueError, desc)
 
-            m_len = tl.m_len
+            m_len = tl._m_len
             init_time = tl.init_time
             end_time = tl.curr_time
 
@@ -731,7 +740,7 @@ class Plotter(_GenericPlotter):
         fig.tight_layout()
         self._display_figure(save_fig)
 
-    def plot_rm_queuing(self, rm_id: str, ax=None, yax_labels: bool|list|tuple=True, xax_labels: bool=True, pct_capacity: bool=False, plot_delay: bool=False, cumulative_delay: bool=False, time_range: list|tuple|None=None, show_events: str|list|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
+    def plot_rm_queuing(self, rm_id: str, ax=None, yax_labels: bool|list|tuple=True, xax_labels: bool=True, pct_capacity: bool=False, plot_delay: bool=True, cumulative_delay: bool=False, time_range: list|tuple|None=None, show_events: str|list|None=None, fig_title: str|None=None, save_fig: str|None=None) -> None:
         """
         Plot ramp metering rate.
         
@@ -821,7 +830,7 @@ class Plotter(_GenericPlotter):
             ax1.set_ylim([0, get_axis_lim(queue_lengths)])
             def_y_label = "Queue Length (No. of Vehicles)"
 
-        ax1.plot(data_time_vals, queue_lengths, linewidth=1, zorder=3, color=colour)
+        ax1.plot(data_time_vals, queue_lengths, linewidth=1 if plot_delay else 1.2, zorder=3, color=colour)
         if xax_labels: ax1.set_xlabel(self._default_labels["sim_time"])
         if (isinstance(yax_labels, bool) and yax_labels) or (isinstance(yax_labels, (list, tuple)) and len(yax_labels) == 2 and yax_labels[0]):
             ax1.set_ylabel(def_y_label)
@@ -832,7 +841,7 @@ class Plotter(_GenericPlotter):
         if time_range == None: time_range = [-math.inf, math.inf]
         ax1.set_xlim([max(time_range[0], data_time_vals[0]), min(time_range[1], data_time_vals[-1])])
 
-        ax1.grid(True, 'both', color='grey', linestyle='-', linewidth=0.5)
+        self._add_grid(ax1)
         if not is_subplot or fig_title != None:
             if not isinstance(fig_title, str):
                 default_title = "{0}'{1}' Queue Lengths".format(self.sim_label, rm_id)
@@ -852,6 +861,7 @@ class Plotter(_GenericPlotter):
             data_time_vals, queue_delays = limit_vals_by_range(all_data_time_vals, queue_delays, time_range)
             if cumulative_delay: queue_delays = get_cumulative_arr(queue_delays)
             ax2 = ax1.twinx()
+            ax2.grid(False)
 
             ax2.plot(data_time_vals, queue_delays, linewidth=1, zorder=3, color=colour)
             ax2.tick_params(axis='y', labelcolor=colour)
@@ -1325,7 +1335,7 @@ class Plotter(_GenericPlotter):
         masked_array = np.ma.array(att_matrix, mask=np.isnan(att_matrix))
         cmap = matplotlib.cm.Reds
         cmap.set_bad('#f7f7f7')
-        ax.matshow(masked_array, interpolation='nearest', cmap=cmap)
+        ax.matshow(masked_array, interpolation='nearest', cmap=cmap, zorder=2)
 
         ax.set_xticks(np.arange(len(all_destinations)), labels=all_destinations)
         ax.set_yticks(np.arange(len(all_origins)), labels=all_origins)
@@ -1337,7 +1347,7 @@ class Plotter(_GenericPlotter):
             for col in range(att_matrix.shape[1]):
                 if not np.isnan(att_matrix[row, col]):
                     ax.text(x=col, y=row, s=round(att_matrix[row, col], 2) if trip_time_unit != "seconds" else int(att_matrix[row, col]),
-                            va='center', ha='center', color='white', path_effects=[pe.withStroke(linewidth=2, foreground="black")]) 
+                            va='center', ha='center', color='white', path_effects=[pe.withStroke(linewidth=2, foreground="black")], zorder=12) 
 
         plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
 
@@ -1623,7 +1633,7 @@ class Plotter(_GenericPlotter):
         start, end, step = rg_data["init_time"], rg_data["curr_time"], self.sim_data["step_len"]
         y_vals = get_cumulative_arr(rg_data["n_diverted"])
 
-        if len(y_vals) == 0:
+        if len(rg_data["activation_times"]) == 0:
             desc = "RG controller '{0}' has no data, likely was not activated.".format(rg_id)
             raise_error(ValueError, desc)
         
@@ -2261,7 +2271,7 @@ class Plotter(_GenericPlotter):
 class MultiPlotter(_GenericPlotter):
     """ Visualisation class that plots TUD-SUMO data for multiple simulations. """
 
-    def __init__(self, groups_title: str|None=None, scenario_label: str|None=None, units: str="metric", time_unit: str="seconds", sim_data_loc: str="", save_fig_loc: str="", save_fig_dpi: int=600, overwrite_figs: bool=True) -> None:
+    def __init__(self, groups_title: str|None=None, scenario_label: str|None=None, units: str="metric", time_unit: str="seconds", sim_data_loc: str="", stylesheet: str="seaborn-v0_8-whitegrid", save_fig_loc: str="", save_fig_dpi: int=600, overwrite_figs: bool=True) -> None:
         """
         Args:
             `groups_title` (str, optional): Groups title (ie. 'Algorithm' label when comparing results of different algorithms)
@@ -2269,6 +2279,7 @@ class MultiPlotter(_GenericPlotter):
             `units` (str): Simulation data units, must match all added simulations (must be ['_metric_'|'_imperial_'|'_uk_'])
             `time_unit` (str): Plotting time unit used for all plots (must be ['_steps_'|'_seconds_'|'_minutes_'|'_hours_'])
             `sim_data_loc` (str): Location of simulation data files (for all simulations)
+            `stylesheet` (str): Matplotlib stylesheet (defaults to 'seaborn-v0_8-whitegrid')
             `save_fig_loc` (str): Figure filepath when saving (defaults to current file)
             `save_fig_dpi` (int): Figure dpi when saving (defaults to 600dpi)
             `overwrite_figs` (bool): Denotes whether to allow overwriting of saved figures with the same name
@@ -2285,8 +2296,11 @@ class MultiPlotter(_GenericPlotter):
 
         self.sim_data_loc = sim_data_loc
         self.groups_title = groups_title
+        self.stylesheet = stylesheet
         
-        super().__init__(units, time_unit, save_fig_loc, save_fig_dpi, overwrite_figs)
+        super().__init__(units=units, time_unit=time_unit, stylesheet=stylesheet,
+                         save_fig_loc=save_fig_loc, save_fig_dpi=save_fig_dpi,
+                         overwrite_figs=overwrite_figs)
 
     def __str__(self): return "<{0}>".format(self.__name__)
     def __name__(self): return "MultiPlotter"
