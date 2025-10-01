@@ -89,10 +89,12 @@ class Simulation:
         
         self._default_view = 'View #0'
         self._gui_views = []
-        self._gui_veh_tracking = {}
+        self._gui_veh_tracking = None
         self._recorder = None
 
         self._weather_events = set([])
+
+        self._closed_lanes = None
 
         from .__init__ import __version__
         self._tuds_version = __version__
@@ -4520,6 +4522,7 @@ class Simulation:
 
         traci.gui.trackVehicle(view_id, vehicle_id)
 
+        if not isinstance(self._gui_veh_tracking, dict): self._gui_veh_tracking = {}
         self._gui_veh_tracking[view_id] = vehicle_id
 
     def gui_stop_tracking(self, view_id: str | None) -> None:
@@ -4535,7 +4538,7 @@ class Simulation:
         if not self._gui:
             desc = f"Cannot stop vehicle tracking (GUI is not active)."
             raise_error(SimulationError, desc, self.curr_step)
-        elif view_id not in self._gui_veh_tracking:
+        elif not isinstance(self._gui_veh_tracking, dict) or view_id not in self._gui_veh_tracking:
             desc = f"View ID '{view_id}' is not tracking a vehicle."
             raise_error(KeyError, desc, self.curr_step)
 
@@ -4555,7 +4558,8 @@ class Simulation:
             `view_id` (str, optional): View ID (defaults to default view)
         """
         
-        return view_id in self._gui_veh_tracking
+        if isinstance(self._gui_veh_tracking, dict): return view_id in self._gui_veh_tracking
+        return False        
     
     def add_gui_view(self, view_id: str, bounds: list | tuple | None = None, zoom: int | float | None = None) -> None:
         """
