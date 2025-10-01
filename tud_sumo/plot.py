@@ -19,7 +19,7 @@ class _GenericPlotter():
 
         self._default_labels = {"no_vehicles": "No. of Vehicles", "no_waiting": "No. of Waiting Vehicles", "tts": "Total Time Spent (s)", "twt": "Total Waiting Time (s)", "avg_wt": "Waiting Time (s)",
                                 "delay": "Delay (veh s)", "avg_delay": "Delay (s)", "throughput": "Throughput (veh/hr)", "vehicle_counts": "No. of Vehicles", "flows": "Flow (vehicles/hour)",
-                                "occupancies": "Occupancy (%)", "densities": "Density unit", "metres": "Distance (m)", "kilometres": "Distance (km)", "yards": "Distance (yd)", "feet": "Distance (ft)",
+                                "occupancies": "Occupancy (%)", "densities": "Density (veh/km/lane)", "metres": "Distance (m)", "kilometres": "Distance (km)", "yards": "Distance (yd)", "feet": "Distance (ft)",
                                 "miles": "Distance (mi)", "m/s": "Speed (m/s)", "kmph": "Speed (kmph)", "mph": "Speed (mph)", "steps": "Time (Simulation Steps)", "seconds": "Time (s)", "minutes": "Time (m)",
                                 "hours": "Time (hr)", "to_depart": "No. of Vehicles"}
 
@@ -211,7 +211,7 @@ class _GenericPlotter():
                     _, y_lim = ax.get_xlim(), ax.get_ylim()
                     for event_id in event_ids:
 
-                        if "weather" in event_id: e_colour = self.LICHTGROEN
+                        if "WEATHER" in event_id.upper(): e_colour = self.LICHTGROEN
                         else: e_colour = self.ROOD
                         event = self.sim_data["data"]["events"][statuses[event_id]][event_id]
                         event_start, event_end = convert_units([event["start_time"], event["end_time"]], "steps", self.time_unit, self.sim_data["step_len"])

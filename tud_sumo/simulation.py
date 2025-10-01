@@ -2387,7 +2387,7 @@ class Simulation:
         omitting `locations`.
 
         Args:
-            `duration` (int, float): Duration of active weather effects
+            `duration` (int, float): Duration of active weather effects in seconds
             `strength` (float): Used as the default reduction/increase value when not given (defaults to 0.2)
             `locations` (list, tuple, optional): List of edge/lane IDs where effects will be active (defaults to network-wide effects)
             `weather_id` (str, optional): Event ID (defaults to 'weather_x', where x is the )
@@ -2724,7 +2724,7 @@ class Simulation:
             `route_edges` (list, optional): Set vehicle route by list of edges
             `speed_safety_checks` (bool, optional): (**Indefinitely**) set whether speed/acceleration safety constraints are followed when setting speed
             `lc_safety_checks` (bool, optional): (**Indefinitely**) set whether lane changing safety constraints are followed when changing lane
-            `stop` (bool, optional): Stop the vehicle at its current position
+            `stop` (bool, optional): Stop the vehicle on the following edge
         """
 
         if isinstance(vehicle_ids, str): vehicle_ids = [vehicle_ids]
@@ -3104,7 +3104,7 @@ class Simulation:
     def get_vehicle_type_vals(self, vehicle_types: str | list | tuple, data_keys: str | list) -> dict | str | float | tuple:
         """
         Get data values for specific vehicle type(s) using a list of data keys. Valid data keys are;
-        '_vehicle_class_', '_colour_', '_length_', '_width_', '_height_', '_headway_', '_imperfection_', '_mass_',
+        '_vehicle_class_', '_colour_', '_length_', '_width_', '_height_', '_headway_', '_imperfection_',
         '_max_speed_', '_speed_factor_', '_speed_dev_', '_min_gap_', '_max_acceleration_', '_max_deceleration_',
         '_max_lateral_speed_', '_emission_class_', '_gui_shape_'
         
@@ -3502,16 +3502,15 @@ class Simulation:
         Get data values for specific vehicle using a list of data keys. Valid data keys are;
         
         **Vehicle Characteristics**:
-        '_type_', '_colour_', '_length_', 
+        '_type_', '_length_', 
 
         **Vehicle Status**:
         '_speed_', '_is_stopped_', '_max_speed_', '_allowed_speed_', '_speed_factor_', '_headway_', '_imperfection_',
         '_acceleration_', '_max_acceleration_', '_max_deceleration_', '_position_', '_altitude_', '_heading_',
-        '_edge_id_', '_lane_id_', '_lane_idx_', '_route_id_', '_route_idx_', '_route_edges_', '_next_edge_id_',
-        '_leader_id_', '_leader_dist_'
+        '_edge_id_', '_lane_id_', '_lane_idx_', '_next_edge_id_', '_leader_id_', '_leader_dist_'
 
         **Trip Data**:
-        '_departure_', '_origin_', '_destination_'
+        '_route_id_', '_route_idx_', '_route_edges_', '_departure_', '_origin_', '_destination_'
         
         Args:
             `vehicle_ids` (str, list, tuple): Vehicle ID or list of IDs
