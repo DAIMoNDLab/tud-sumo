@@ -2,6 +2,8 @@ import json, math, os.path, numpy as np, pickle as pkl
 from copy import deepcopy
 from random import random, seed, choice
 from tqdm import tqdm
+from scipy.interpolate import griddata
+from scipy.ndimage import gaussian_filter
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -1685,13 +1687,27 @@ class Plotter(_GenericPlotter):
 
         self._display_figure(save_fig)
 
-    def plot_space_time_diagram(self, edge_ids: list | tuple, upstream_at_top: bool=True, dist_labels: list | tuple | None=None, time_range: list | tuple | None=None, fig_title: str | None=None, save_fig: str | None=None) -> None:
+    def plot_space_time_diagram(self,
+                                edge_ids: list | tuple,
+                                *,
+                                lane_idx: int | None = None,
+                                upstream_at_top: bool = True,
+                                gf_sigma: list | tuple | int | None = None,
+                                matrix_res: int = 1000,
+                                dist_labels: list | tuple | None = None,
+                                time_range: list | tuple | None = None,
+                                fig_title: str | None = None,
+                                save_fig: str | None = None
+                               ) -> None:
         """
         Plot space time data from tracked edge data.
         
         Args:
             `edge_ids` (list, tuple): Single tracked egde ID or list of IDs
+            `lane_idx` (int, optional): Used to only include specific lanes, by index (across all edges)
             `upstream_at_top` (bool): If `True`, upstream values are displayed at the top of the diagram
+            `gf_sigma` (list, tuple, int, optional): If given, used as standard deviation for gaussian filter kernel (a (1x2) array representing vertical then horizontal smoothing, or single value used for both)
+            `matrix_res` (int): Base matrix resolution when smoothing data (adjusted for x/y axis depending on respective ranges)
             `dist_labels` (list, tuple, optional): A list of labels and distances (km/mi) to be plotted on the graph (as a list of (str, [int | float]) pairs)
             `time_range` (list, tuple, optional): Plotting time range (in plotter class units)
             `fig_title` (str, optional): If given, will overwrite default title
@@ -1709,7 +1725,6 @@ class Plotter(_GenericPlotter):
         if not isinstance(edge_ids, (list, tuple)): edge_ids = [edge_ids]
 
         fig, ax = plt.subplots(1, 1)
-        edge_offset = 0
 
         total_len = sum([self.sim_data["data"]["edges"][e_id]["length"] for e_id in edge_ids])
 
@@ -1718,59 +1733,95 @@ class Plotter(_GenericPlotter):
         elif self.units in ["METRIC", "UK"]:
             orig_units, new_units = "kilometres", "kilometres" if total_len > 1 else "metres"
 
-        x_label, y_label = self._default_labels["sim_time"], self._default_labels[new_units]
-
         if time_range == None: time_range = [-math.inf, math.inf]
 
-        ordered_points = {}
-        for e_id in edge_ids:
-            if e_id not in self.sim_data["data"]["edges"].keys():
-                desc = "Edge '{0}' not found in tracked edges.".format(e_id)
+        x_y_vals, y_offset = {}, 0
+        for edge_id in edge_ids:
+            if edge_id not in self.sim_data["data"]["edges"].keys():
+                desc = f"Edge '{edge_id}' not found in tracked edges."
                 raise_error(KeyError, desc)
-            else: e_data = self.sim_data["data"]["edges"][e_id]
+            else: e_data = self.sim_data["data"]["edges"][edge_id]
 
             step_vehicles, edge_length = e_data["step_vehicles"], e_data["length"]
-            start, step = e_data["init_time"], self.sim_data["step_len"]
+            start, step_length = e_data["init_time"], self.sim_data["step_len"]
 
+            edge_length = convert_units(edge_length, orig_units, new_units)
             curr_step = start
 
             for step_data in step_vehicles:
-                curr_time = convert_units(curr_step, "steps", self.time_unit, step)
+                curr_time = convert_units(curr_step, "steps", self.time_unit, step_length)
                 if curr_time <= time_range[1] and curr_time >= time_range[0]:
                     for veh_data in step_data:
+                        if isinstance(lane_idx, int) and veh_data[3] != lane_idx: continue
+                        y_val = (veh_data[1] * edge_length) + y_offset
 
-                        y_val = (veh_data[1] * edge_length) + edge_offset
-                        if not upstream_at_top: y_val = total_len - y_val
-                        y_val = convert_units(y_val, orig_units, new_units)
-
-                        if curr_step not in ordered_points.keys():
-                            ordered_points[curr_step] = [(y_val, veh_data[2])]
-                        else: ordered_points[curr_step].append((y_val, veh_data[2]))
+                        if curr_step not in x_y_vals: x_y_vals[curr_step] = []
+                        x_y_vals[curr_step].append((y_val, veh_data[2]))
                         
                 elif curr_time > time_range[1]:
                     break
 
                 curr_step += 1
 
-            edge_offset += edge_length
+            y_offset += edge_length
 
-        idxs = ordered_points.keys()
-        x_vals, y_vals, speed_vals = [], [], []
-        for idx in idxs:
-            x_vals += [convert_units(idx, "steps", self.time_unit, step)] * len(ordered_points[idx])
-            dist_speed = ordered_points[idx]
-            y_vals += [val[0] for val in dist_speed]
-            speed_vals += [val[1] for val in dist_speed]
+        times, distances, speeds = [], [], []
 
-        if len(x_vals) == 0 or len(y_vals) == 0:
+        steps = list(x_y_vals.keys())
+        steps.sort()
+
+        for step in steps:
+            x_y_vals[step].sort(key=lambda p: p[0])
+            d, s = zip(*x_y_vals[step])
+            times += [step] * len(d)
+            distances += list(d)
+            speeds += list(s)
+
+        times = convert_units(times, "steps", self.time_unit, step_length)
+        if not upstream_at_top: distances = [total_len - distance for distance in distances]
+
+        if len(times) == 0 or len(distances) == 0:
             if time_range == None:
                 desc = "No data to plot (no vehicles recorded on edges)."
                 raise_error(ValueError, desc)
             else:
-                desc = "No data to plot (no vehicles recorded during time frame '{0}-{1}{2}').".format(time_range[0], time_range[1], self.time_unit)
+                desc = f"No data to plot (no vehicles recorded during time frame '{time_range[0]}-{time_range[1]}{self.time_unit}')."
                 raise_error(ValueError, desc)
         
-        points = ax.scatter(x_vals, y_vals, c=speed_vals, s=0.5, cmap='hot', zorder=1)
+        times, distances, speeds = np.array(times), np.array(distances), np.array(speeds)
+
+        if gf_sigma != None:
+            if isinstance(gf_sigma, (list, tuple)):
+                validate_list_types(gf_sigma, ((int, float), (int, float)), True, "gf_sigma")
+
+            elif isinstance(gf_sigma, (int, float)):
+                gf_sigma = [gf_sigma] * 2
+
+            else:
+                desc = f"Invalid gf_sigma '{gf_sigma}' (must be type [list|tuple|int|float], not '{type(gf_sigma)}')."
+                raise_error(TypeError, desc)
+
+            ratio = abs(distances.max() - distances.min()) / abs(times.max() - times.min())
+            ratio = np.clip(ratio, 0.25, 4)
+
+            if ratio >= 1:
+                num_x = matrix_res
+                num_y = int(matrix_res * ratio)
+            else:
+                num_y = matrix_res
+                num_x = int(matrix_res / ratio)
+
+            xi = np.linspace(times.min(), times.max(), max(num_x, 100))
+            yi = np.linspace(distances.min(), distances.max(), max(num_y, 100))
+            Xi, Yi = np.meshgrid(xi, yi)
+
+            Zi = griddata((times, distances), speeds, (Xi, Yi), method='linear')
+            Zi_smooth = gaussian_filter(Zi, sigma=gf_sigma)
+
+            plt_data = ax.imshow(Zi_smooth, origin='lower', aspect='auto', cmap='hot', interpolation='bilinear',
+                                 extent=[times.min(), times.max(), distances.min(), distances.max()], zorder=1)
+        
+        else: plt_data = ax.scatter(times, distances, c=speeds, s=0.5, cmap='hot', zorder=1)
 
         if dist_labels != None:
             validate_list_types(dist_labels, (list, tuple), param_name='dist_labels')
@@ -1785,19 +1836,20 @@ class Plotter(_GenericPlotter):
                 label, dist = dist_label
                 dist = convert_units(dist, orig_units, new_units)
                 
-                ax.plot([min(x_vals), max(x_vals)], [dist, dist], linestyle='--', color='black', linewidth=1.5, zorder=10)
-                padding = (max(x_vals) - min(x_vals)) * 0.02
+                ax.plot([min(times), max(times)], [dist, dist], linestyle='--', color='black', linewidth=1.5, zorder=10)
+                padding = (max(times) - min(times)) * 0.02
                 if label != "" and label != None:
-                    ax.text(padding + min(x_vals), dist, label, fontsize=6,
+                    ax.text(padding + min(times), dist, label, fontsize=6,
                             zorder=20, horizontalalignment='left', verticalalignment='center', color='red',
                             bbox=dict(facecolor='white', alpha=0.9, linewidth=0))
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.1)
-        plt.colorbar(points, cax=cax, label=self._default_labels["speed"])
+        plt.colorbar(plt_data, cax=cax, label=self._default_labels["speed"])
 
-        ax.set_xlim(min(x_vals), max(x_vals))
-        ax.set_ylim(0, max(y_vals))
+        x_label, y_label = self._default_labels["sim_time"], self._default_labels[new_units]
+        ax.set_xlim(min(times), max(times))
+        ax.set_ylim(0, max(distances))
         ax.set_ylabel(y_label)
         ax.set_xlabel(x_label)
 

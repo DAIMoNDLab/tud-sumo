@@ -19,6 +19,7 @@ dependencies = [
     "tqdm",
     "traci",
     "moviepy",
+    "scipy",
 ]
 keywords = ["traffic simulator", "microscopic", "SUMO"]
 classifiers = [

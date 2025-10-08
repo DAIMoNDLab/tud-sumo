@@ -6,4 +6,4 @@ from tud_sumo.plot import Plotter
 from tud_sumo.videos import Recorder
 from tud_sumo.demand import DemandProfile
 
-__version__ = "3.3.0"
+__version__ = "3.3.1"
