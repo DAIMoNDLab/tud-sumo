@@ -1706,7 +1706,7 @@ class Plotter(_GenericPlotter):
             `edge_ids` (list, tuple): Single tracked egde ID or list of IDs
             `lane_idx` (int, optional): Used to only include specific lanes, by index (across all edges)
             `upstream_at_top` (bool): If `True`, upstream values are displayed at the top of the diagram
-            `gf_sigma` (list, tuple, int, optional): If given, used as standard deviation for gaussian filter kernel (a (1x2) array representing vertical then horizontal smoothing, or single value used for both)
+            `gf_sigma` (list, tuple, int, optional): If given, data is smoothed. If set to 0, no gaussian filter is applied, otherwise, it is used as standard deviation for gaussian filter kernel (as (1x2) array representing vertical then horizontal smoothing, or single value used for both)
             `matrix_res` (int): Base matrix resolution when smoothing data (adjusted for x/y axis depending on respective ranges)
             `dist_labels` (list, tuple, optional): A list of labels and distances (km/mi) to be plotted on the graph (as a list of (str, [int | float]) pairs)
             `time_range` (list, tuple, optional): Plotting time range (in plotter class units)
@@ -1795,7 +1795,10 @@ class Plotter(_GenericPlotter):
                 validate_list_types(gf_sigma, ((int, float), (int, float)), True, "gf_sigma")
 
             elif isinstance(gf_sigma, (int, float)):
-                gf_sigma = [gf_sigma] * 2
+                if gf_sigma > 0: gf_sigma = [gf_sigma] * 2
+                elif gf_sigma < 0:
+                    desc = f"Invalid gf_sigma '{gf_sigma}' (must be >= 0)."
+                    raise_error(ValueError, desc)
 
             else:
                 desc = f"Invalid gf_sigma '{gf_sigma}' (must be type [list|tuple|int|float], not '{type(gf_sigma)}')."
@@ -1816,9 +1819,9 @@ class Plotter(_GenericPlotter):
             Xi, Yi = np.meshgrid(xi, yi)
 
             Zi = griddata((times, distances), speeds, (Xi, Yi), method='linear')
-            Zi_smooth = gaussian_filter(Zi, sigma=gf_sigma)
+            if isinstance(gf_sigma, (list, tuple)) and sum(gf_sigma) > 0: Zi = gaussian_filter(Zi, sigma=gf_sigma)
 
-            plt_data = ax.imshow(Zi_smooth, origin='lower', aspect='auto', cmap='hot', interpolation='bilinear',
+            plt_data = ax.imshow(Zi, origin='lower', aspect='auto', cmap='hot', interpolation='bilinear',
                                  extent=[times.min(), times.max(), distances.min(), distances.max()], zorder=1)
         
         else: plt_data = ax.scatter(times, distances, c=speeds, s=0.5, cmap='hot', zorder=1)
