@@ -2449,9 +2449,9 @@ class Simulation:
         
         if self._scheduler != None:
             active_events = self._scheduler.get_event_ids("active")
-            return (e_id for e_id in active_events if e_id in self._weather_events)
+            return tuple(e_id for e_id in active_events if e_id in self._weather_events)
         
-        else: return ()
+        else: return tuple()
 
     def vehicle_exists(self, vehicle_id: str) -> bool:
         """

@@ -1856,11 +1856,12 @@ class Plotter(_GenericPlotter):
         ax.set_ylabel(y_label)
         ax.set_xlabel(x_label)
 
-        if not isinstance(fig_title, str):
-            if len(edge_ids) == 0: e_label = "Edge '{0}'".format(edge_ids[0])
-            elif upstream_at_top: e_label = "Edges '{0}' - '{1}'".format(edge_ids[-1], edge_ids[0])
-            else: e_label = "Edges '{0}' - '{1}'".format(edge_ids[0], edge_ids[-1])
-            fig_title = "{0}{1}".format(self.sim_label, e_label)
+        if fig_title == None:
+            if len(edge_ids) == 0: e_label = f"Edge '{edge_ids[0]}'"
+            elif upstream_at_top: e_label = f"Edges '{edge_ids[-1]}' - '{edge_ids[0]}'"
+            else: e_label = f"Edges '{edge_ids[0]}' - '{edge_ids[-1]}'"
+            l_label = "" if lane_idx == None else f" (Lane {lane_idx})"
+            fig_title = f"{self.sim_label}{e_label}{l_label}"
 
         ax.set_title(fig_title, pad=20)
 
@@ -2036,8 +2037,10 @@ class Plotter(_GenericPlotter):
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
         if fig_title == None:
-            fig_title = "Vehicle Trajectories"
-            if lane_idx != None: fig_title += " (Lane {0})".format(lane_idx+1)
+            if len(edge_ids) == 0: e_label = f"Edge '{edge_ids[0]}'"
+            else: e_label = f"Edges '{edge_ids[0]}' - '{edge_ids[-1]}'"
+            l_label = "" if lane_idx == None else f" (Lane {lane_idx})"
+            fig_title = f"{self.sim_label}{e_label}{l_label}"
         fig_title = self.sim_label + fig_title
         ax.set_title(fig_title, pad=20)
 
