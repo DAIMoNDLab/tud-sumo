@@ -1580,7 +1580,8 @@ class Plotter(_GenericPlotter):
                 else: prev_line = ax.plot(convert_units(x_vals, "steps", self.time_unit, step), y_vals, color=prev_line[0].get_color(), linestyle=prev_line[0].get_linestyle(), label=label, linewidth=1)
 
         self._plot_event(ax, show_events)
-
+        self._add_grid(ax, None)
+        
         y_lim = get_axis_lim(max_speed)
         ax.set_ylim(0, y_lim)
         xlim = convert_units([start, end], "steps", self.time_unit, step)
@@ -2452,7 +2453,7 @@ class MultiPlotter(_GenericPlotter):
                             desc = "Invalid Simulation '{0}' (step length '{1}' does not match previous '{2}').".format(sim_label, sim_data["step_len"], step_length)
                             raise_error(ValueError, desc)
 
-                    if "all_vehicles" in sim_data["data"]: del sim_data["data"]["all_vehicles"]
+                    if "fc_data" in sim_data["data"]: del sim_data["data"]["fc_data"]
 
                     self.sim_datasets[sim_id] = sim_data
                     self.sim_dataset_ids.append(sim_id)

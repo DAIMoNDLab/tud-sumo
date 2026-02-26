@@ -22,6 +22,8 @@ class Simulation:
             `verbose` (bool): Denotes whether to print simulation information
         """
 
+        # Should ideally be changed to use @dataclass for groups of variables (particularly hidden ones) 
+
         self.curr_step = 0
         self.curr_time = 0
         self.step_length = None
@@ -70,7 +72,7 @@ class Simulation:
 
         self._include_insertion_delay = False
 
-        self._get_individual_vehicle_data = True
+        self._get_fc_data = True
         self._all_curr_vehicle_ids = set([])
         self._all_loaded_vehicle_ids = set([])
         self._all_added_vehicles = set([])
@@ -117,7 +119,7 @@ class Simulation:
               gui_file: str | None = None,
               cmd_options: list | None = None,
               units: str | int = 1,
-              get_individual_vehicle_data: bool = True,
+              get_fc_data: bool = True,
               include_insertion_delay: bool = False,
               automatic_subscriptions: bool = True,
               suppress_warnings: bool = False,
@@ -138,7 +140,7 @@ class Simulation:
             `gui_file` (str, optional): Location of '_.xml_' gui (view settings) file
             `cmd_options` (list, optional): List of any other command line options
             `units` (str, int): Data collection units [1 (metric) | 2 (IMPERIAL) | 3 (UK)] (defaults to 'metric')
-            `get_individual_vehicle_data` (bool): Denotes whether to get individual vehicle data (set to `False` to improve performance)
+            `get_fc_data` (bool): Denotes whether to collect floating car data (set to `False` to improve performance)
             `include_insertion_delay` (bool): Denotes whether to include insertion delay (delay of vehicles waiting to be inserted into the simulation) in network-wide delay calculations
             `automatic_subscriptions` (bool): Denotes whether to automatically subscribe to commonly used vehicle data (speed and position, defaults to `True`)
             `suppress_warnings` (bool): Suppress simulation warnings
@@ -322,7 +324,7 @@ class Simulation:
         for route_id in all_route_ids:
             self._all_routes[route_id] = traci.route.getEdges(route_id)
 
-        self._get_individual_vehicle_data = get_individual_vehicle_data
+        self._get_fc_data = get_fc_data
         self._include_insertion_delay = include_insertion_delay
         self._automatic_subscriptions = automatic_subscriptions
 
@@ -767,11 +769,66 @@ class Simulation:
         Save all vehicle, detector and junction data in a JSON or pickle file.
         
         Args:
-            `filename` (str, optional): Output filepath (defaults to '_./{scenario_name}.json_')
+            `filename` (str, optional): Output filepath (defaults to '_./{scenario_name}.pkl_')
             `overwrite` (bool): Prevent previous outputs being overwritten
             `json_indent` (int, optional): Indent used when saving JSON files
         """
 
+        filename, w_class, w_mode = self._get_save_filename(filename, overwrite)
+
+        if self._scheduler != None: self._all_data["data"]["events"] = self._scheduler.__dict__()
+        with open(filename, w_mode) as fp:
+            if w_mode == "wb": w_class.dump(self._all_data, fp)
+            else: w_class.dump(self._all_data, fp, indent=json_indent)
+            
+    def save_fc_data(self, filename: str | None = None, *, overwrite: bool = True, json_indent: int | None = 4) -> None:
+        """
+        Save all floating car data in a JSON or pickle file.
+
+        Args:
+            `filename` (str, optional): Output filepath (defaults to '_./{scenario_name}_fc_data.pkl_')
+            `overwrite` (bool): Prevent previous outputs being overwritten
+            `json_indent` (int, optional): Indent used when saving JSON files
+        """
+
+        if not self._get_fc_data:
+            desc = "No floating car data collected."
+            raise_error(KeyError, desc, self.curr_step)
+
+        filename, w_class, w_mode = self._get_save_filename(filename, overwrite, "_fc_data")
+
+        static_keys = ["type", "departure", "destination", "origin"]
+        dynamic_keys = ["longitude", "latitude", "altitude", "heading", "speed", "lane_id"]
+
+        new_data, veh_info = {}, {}
+        for key, value in self._all_data.items():
+            if key != "data": new_data[key] = value
+            else: 
+                
+                fc_data = []
+
+                for step in value["fc_data"]:
+                    step_data = {}
+                    for veh_id, veh_data in step.items():
+                        if veh_id not in veh_info: veh_info[veh_id] = {sk: veh_data[sk] for sk in static_keys}
+                        step_data[veh_id] = {dk: veh_data[dk] for dk in dynamic_keys}
+
+                    fc_data.append(step_data)
+
+                new_data["veh_info"] = veh_info
+                new_data["fc_data"] = fc_data
+
+
+        with open(filename, w_mode) as fp:
+            if w_mode == "wb": w_class.dump(new_data, fp)
+            else: w_class.dump(new_data, fp, indent=json_indent)
+
+    def _get_save_filename(self, filename, overwrite, def_suffix=""):
+
+        if self._all_data == None:
+            desc = "No data to save as a simulation has not been run."
+            raise_error(SimulationError, desc, self.curr_step)
+    
         if filename == None:
             if self.scenario_name != None:
                 filename = self.scenario_name
@@ -784,8 +841,8 @@ class Simulation:
         elif filename.endswith(".pkl"):
             w_class, w_mode = pkl, "wb"
         else:
-            filename += ".json"
-            w_class, w_mode = json, "w"
+            filename += f"{def_suffix}.pkl"
+            w_class, w_mode = pkl, "wb"
 
         if os.path.exists(filename) and overwrite:
             if not self._suppress_warnings: raise_warning("File '{0}' already exists and will be overwritten.".format(filename), self.curr_step)
@@ -793,14 +850,7 @@ class Simulation:
             desc = "File '{0}' already exists and cannot be overwritten.".format(filename)
             raise_error(FileExistsError, desc, self.curr_step)
 
-        if self._all_data != None:
-            if self._scheduler != None: self._all_data["data"]["events"] = self._scheduler.__dict__()
-            with open(filename, w_mode) as fp:
-                if w_mode == "wb": w_class.dump(self._all_data, fp)
-                else: w_class.dump(self._all_data, fp, indent=json_indent)
-        else:
-            desc = "No data to save as a simulation has not been run."
-            raise_error(SimulationError, desc, self.curr_step)
+        return filename, w_class, w_mode
 
     def add_tracked_edges(self, edge_ids: str | list | None = None):
         """
@@ -945,7 +995,7 @@ class Simulation:
                 if len(self._demand_profiles) > 0:
                     all_data["data"]["demand"] = {"headers": list(self._demand_profiles.values())[0]._demand_headers, "profiles": [dp._demand_arrs for dp in self._demand_profiles.values()]}
                 all_data["data"]["trips"] = {"incomplete": {}, "completed": {}}
-                if self._get_individual_vehicle_data: all_data["data"]["all_vehicles"] = []
+                if self._get_fc_data: all_data["data"]["fc_data"] = []
                 if self._scheduler != None: all_data["data"]["events"] = {}
             
             else: all_data = prev_data
@@ -983,7 +1033,7 @@ class Simulation:
             last_step_data, all_v_data = self._step(vehicle_types=vehicle_types, keep_data=keep_data)
 
             if keep_data:
-                if self._get_individual_vehicle_data: all_data["data"]["all_vehicles"].append(all_v_data)
+                if self._get_fc_data: all_data["data"]["fc_data"].append(all_v_data)
 
                 # Append all detector data to the sim_data dictionary
                 if "detectors" in all_data["data"]:
@@ -1083,7 +1133,7 @@ class Simulation:
 
             # Subscribing to 'altitude' uses POSITION3D, which includes the vehicle x,y coordinates.
             # If not collecting all individual vehicle data, we can instead subcribe to the 2D position.
-            if self._get_individual_vehicle_data: subscriptions += ["acceleration", "heading", "altitude"]
+            if self._get_fc_data: subscriptions += ["acceleration", "heading", "altitude"]
             else: subscriptions.append("position")
 
             self.add_vehicle_subscriptions(list(all_vehicles_in), subscriptions)
@@ -2237,14 +2287,15 @@ class Simulation:
                        vehicle_separation: float = 0,
                        assert_n_vehicles: bool = False,
                        edge_speed: int | float | None = -1,
+                       position: int | float | None = None,
                        highlight_vehicles: bool = True,
                        incident_id: str | None = None
                       ) -> bool:
         """
-        Simulates an incident by stopping vehicles on the road for a period of time, before removing
-        them from the simulation. Vehicle(s) can either be specified using `vehicle_ids`, chosen
-        randomly based location using `geometry_ids`, or vehicles can be chosen randomly throughout
-        the network if neither `vehicle_ids` or `geometry_ids` are given.
+        Simulates an incident by stopping vehicle(s) on the following edge in their route for a
+        period of time, before removing them from the simulation. Vehicle(s) can either be specified
+        using `vehicle_ids`, chosen randomly based location using `geometry_ids`, or vehicles can
+        be chosen randomly throughout the network if neither `vehicle_ids` or `geometry_ids` are given.
         
         Args:
             `duration` (int): Duration of incident (in seconds)
@@ -2254,6 +2305,7 @@ class Simulation:
             `vehicle_separation` (float): Factor denoting how separated randomly chosen vehicles are (0.1-1)
             `assert_n_vehicles` (bool): Denotes whether to throw an error if the correct number of vehicles cannot be found
             `edge_speed` (int, float, None, optional): New max speed for edges where incident vehicles are located (defaults to 15km/h or 10mph). Set to `None` to not change speed.
+            `position` (int, float, optional): Distance along edge where vehicle will stop [0 (start) - 1 (end)]
             `highlight_vehicles` (bool): Denotes whether to highlight vehicles in the SUMO GUI
             `incident_id` (str, optional): Incident event ID used in the simulation data file (defaults to '_incident_{n}_')
 
@@ -2354,13 +2406,13 @@ class Simulation:
                     raise_error(KeyError, desc, self.curr_step)
                 elif highlight_vehicles:
                     self.set_vehicle_vals(vehicle_id, highlight=True)
-                    self.stop_vehicle(vehicle_id, duration=duration)
+                    self.stop_vehicle(vehicle_id, duration=duration, pos=position)
 
             if "vehicles" in event_dict: event_dict["vehicles"]["vehicle_ids"] = vehicle_ids
         
             if edge_speed != None:
                 if edge_speed < 0: edge_speed = 15 if self.units.name == "METRIC" else 10
-                if geometry_ids == None: geometry_ids = [self.get_vehicle_vals(veh_id, "edge_id") for veh_id in vehicle_ids]
+                if geometry_ids == None: geometry_ids = [self.get_vehicle_vals(veh_id, "next_edge_id") for veh_id in vehicle_ids]
                 event_dict["edges"] = {"edge_ids": geometry_ids, "actions": {"max_speed": edge_speed}}
 
         self.add_events({incident_id: event_dict})
@@ -3834,7 +3886,7 @@ class Simulation:
 
             if vehicle_types is None or (isinstance(vehicle_types, (list, tuple)) and vehicle_type in vehicle_types) or (isinstance(vehicle_types, str) and vehicle_type == vehicle_types):
 
-                if self._get_individual_vehicle_data:
+                if self._get_fc_data:
                     vehicle_data = self.get_vehicle_data(vehicle_id)
                     all_vehicle_data[vehicle_id] = vehicle_data
                 else: vehicle_data = self.get_vehicle_vals(vehicle_id, ["speed", "lane_id", "allowed_speed", "is_stopped"])
@@ -4205,7 +4257,84 @@ class Simulation:
                         else:
                             desc = "({0}): Invalid right_lc value '{1}' (must be [str], not '{2}').".format(command, value, type(value).__name__)
                             raise_error(TypeError, desc, self.curr_step)
-            
+
+    def close_road(self, geometry_ids: str | list | tuple) -> None:
+        """
+        Close a edge/lane indefinitely from its ID.
+
+        Args:
+            `geometry_ids` (str, list, tuple): Edge/lane ID or list of edge/lane IDs
+        """
+
+        if not isinstance(self._closed_lanes, dict): self._closed_lanes = {}
+        geometry_ids = [geometry_ids] if not isinstance(geometry_ids, (list, tuple)) else geometry_ids
+
+        for geometry_id in geometry_ids:
+            geometry_type = self.geometry_exists(geometry_id)
+            if geometry_type == "lane":
+                self._closed_lanes[geometry_id] = self._close_lane(geometry_id)
+            elif geometry_type == "edge":
+                self._closed_lanes[geometry_id] = {}
+                lane_ids = self.get_geometry_vals(geometry_id, "lane_ids")
+                for lane_id in lane_ids:
+                    self._closed_lanes[geometry_id][lane_id] = self._close_lane(lane_id)
+            else:
+                desc = f"Geometry ID '{geometry_id} not found."
+                raise_error(KeyError, desc, self.curr_step)
+
+    def open_road(self, geometry_ids: str | list | tuple) -> None:
+        """
+        Open a closed a edge/lane indefinitely from its ID.
+
+        Args:
+            `geometry_ids` (str, list, tuple): Edge/lane ID or list of edge/lane IDs
+        """
+
+        geometry_ids = [geometry_ids] if not isinstance(geometry_ids, (list, tuple)) else geometry_ids
+
+        for geometry_id in geometry_ids:
+            geometry_type = self.geometry_exists(geometry_id)
+            if geometry_type == "lane":
+                e_id = None
+                if geometry_id in self._closed_lanes:
+                    self.set_geometry_vals(geometry_id, **self._closed_lanes[geometry_id])
+                    del self._closed_lanes[geometry_id]
+                    continue
+                for g_id, g_data in self._closed_lanes.items():
+                    if isinstance(g_data, dict) and geometry_id in g_data:
+                        e_id = g_id
+                        break
+                if e_id != None:
+                    self.set_geometry_vals(geometry_id, **self._closed_lanes[e_id][geometry_id])
+                    del self._closed_lanes[e_id][geometry_id]
+                else:
+                    desc = f"Lane with ID '{geometry_id}' not closed."
+                    raise_error(ValueError, desc, self.curr_step)
+            elif geometry_type == "edge":
+                if geometry_id in self._closed_lanes:
+                    for lane_id in self._closed_lanes[geometry_id]:
+                        self.set_geometry_vals(lane_id, **self._closed_lanes[geometry_id][lane_id])
+                    del self._closed_lanes[geometry_id]
+                else:
+                    desc = f"Edge with ID '{geometry_id}' not closed."
+                    raise_error(ValueError, desc, self.curr_step)
+
+            else:
+                desc = f"Geometry ID '{geometry_id} not found."
+                raise_error(KeyError, desc, self.curr_step)
+
+    def _close_lane(self, lane_id: str) -> dict:
+        """
+        Disallows all vehicles on a specific lane.
+
+        Args:
+            `lane_id` (str): Lane ID
+        """
+
+        lane_permissions = self.get_geometry_vals(lane_id, ("allowed", "disallowed"))
+        self.set_geometry_vals(lane_id, disallowed=list(set(lane_permissions["allowed"] + lane_permissions["disallowed"])))
+        return lane_permissions
+
     def get_last_step_geometry_vehicles(self, geometry_ids: str | list, *, vehicle_types: list | None = None, flatten: bool = False) -> dict | list:
         """
         Get the IDs of vehicles on a lane or egde, by geometry ID.
@@ -5308,7 +5437,7 @@ def print_summary(sim_data: dict | str, save_file: str | None=None, tab_width: i
         if label[1] != None: _table_print([f"{label[1]}:", f"{round(sum(data), 2)}s"], tab_width)
         print(tertiary_delineator)
 
-    _table_print(["Individual Data:", "Yes" if "all_vehicles" in sim_data["data"].keys() else "No"], tab_width)
+    _table_print(["Floating Car Data:", "Yes" if "fc_data" in sim_data["data"].keys() else "No"], tab_width)
 
     print(secondary_delineator)
     _table_print("Trip Data", tab_width)
