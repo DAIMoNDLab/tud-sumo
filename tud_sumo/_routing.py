@@ -1,6 +1,39 @@
 import traci
 from .utils import *
 
+def _add_route(self, routing: list | tuple, route_id: str | None = None, assert_new_id: bool = True) -> None:
+    """
+    Add a new route. If only 2 edge IDs are given, vehicles calculate
+    optimal route at insertion, otherwise vehicles take specific edges.
+    
+    Args:
+        `routing` (list, tuple): List of edge IDs
+        `route_id` (str, optional): Route ID, if not given, generated from origin-destination
+        `assert_new_id` (bool): If True, an error is thrown for duplicate route IDs
+    """
+    
+    routing = validate_list_types(routing, str, param_name="routing", curr_sim_step=self.curr_step)
+    if isinstance(routing, (list, tuple)):
+        if len(routing) > 1 and _is_valid_path(self, routing):
+            if route_id == None:
+                route_id = "{0}_{1}".format(routing[0], routing[-1])
+
+            if self.route_exists(route_id) == None:
+                traci.route.add(route_id, routing)
+                self._all_routes[route_id] = tuple(routing)
+                self._new_routes[route_id] = tuple(routing)
+
+            elif assert_new_id:
+                desc = "Route or route with ID '{0}' already exists.".format(route_id)
+                raise_error(ValueError, desc, self.curr_step)
+
+            elif not self._suppress_warnings:
+                raise_warning("Route or route with ID '{0}' already exists.".format(route_id), self.curr_step)
+
+        else:
+            desc = "No valid path between edges '{0}' and '{1}.".format(routing[0], routing[-1])
+            raise_error(ValueError, desc, self.curr_step)
+            
 def _get_path_edges(self, origin: str, destination: str, curr_optimal: bool = True) -> list | None:
     """
     Find an optimal route between 2 edges (using the A* algorithm).
@@ -113,36 +146,3 @@ def _is_valid_path(self, edge_ids: list | tuple) -> bool:
                 if edge_ids[idx + 1] not in self.get_geometry_vals(edge_ids[idx], "outgoing_edges"): return False
 
     return True
-
-def _add_route(self, routing: list | tuple, route_id: str | None = None, assert_new_id: bool = True) -> None:
-    """
-    Add a new route. If only 2 edge IDs are given, vehicles calculate
-    optimal route at insertion, otherwise vehicles take specific edges.
-    
-    Args:
-        `routing` (list, tuple): List of edge IDs
-        `route_id` (str, optional): Route ID, if not given, generated from origin-destination
-        `assert_new_id` (bool): If True, an error is thrown for duplicate route IDs
-    """
-    
-    routing = validate_list_types(routing, str, param_name="routing", curr_sim_step=self.curr_step)
-    if isinstance(routing, (list, tuple)):
-        if len(routing) > 1 and _is_valid_path(self, routing):
-            if route_id == None:
-                route_id = "{0}_{1}".format(routing[0], routing[-1])
-
-            if self.route_exists(route_id) == None:
-                traci.route.add(route_id, routing)
-                self._all_routes[route_id] = tuple(routing)
-                self._new_routes[route_id] = tuple(routing)
-
-            elif assert_new_id:
-                desc = "Route or route with ID '{0}' already exists.".format(route_id)
-                raise_error(ValueError, desc, self.curr_step)
-
-            elif not self._suppress_warnings:
-                raise_warning("Route or route with ID '{0}' already exists.".format(route_id), self.curr_step)
-
-        else:
-            desc = "No valid path between edges '{0}' and '{1}.".format(routing[0], routing[-1])
-            raise_error(ValueError, desc, self.curr_step)
