@@ -273,3 +273,62 @@ class RGController:
         if keep_data:
             self.total_vehs.append(total_vehs)
             self.n_diverted.append(n_diverted)
+
+def _add_controllers(self, controller_params: str | dict) -> dict:
+    """
+    Add controllers from parameters in a dictionary/JSON file.
+    
+    Args:
+        `controller_params` (str, dict): Controller parameters dictionary or filepath
+
+    Returns:
+        dict: Dictionary of controller objects by their ID
+    """
+
+    controller_params = load_params(controller_params, "controller_params", self.curr_step)
+
+    for c_id, c_params  in controller_params.items():
+        if c_id in self.controllers:
+            desc = "Controller with ID '{0}' already exists.".format(c_id)
+            raise_error(ValueError, desc, self.curr_step)
+        if isinstance(c_params, (RGController, VSLController)):
+            self.controllers[c_id] = c_params
+        elif isinstance(c_params, dict):
+            if 'type' not in c_params.keys():
+                desc = "No type given (must be [1 (RG) | 2 (VSL)])."
+                raise_error(KeyError, desc, self.curr_step)
+            if c_params['type'] in [1, 2, "VSL", "RG"]:
+                
+                if c_params['type'] in [1, "VSL"]: controller = VSLController(c_id, c_params, self)
+                elif c_params['type'] in [2, "RG"]: controller = RGController(c_id, c_params, self)
+                
+                self.controllers[c_id] = controller
+
+            else:
+                desc = "Invalid controller type (must be [1 (RG) | 2 (VSL)])."
+                raise_error(ValueError, desc, self.curr_step)
+        else:
+            desc = "Invalid parameters type in dictionary (must be [dict | RGController | VSLController], not '{0}').".format(type(c_params).__name__)
+            raise_error(TypeError, desc, self.curr_step)
+
+    return self.controllers
+
+def _remove_controllers(self, controller_ids: str | list | tuple) -> None:
+    """
+    Remove controllers and delete their collected data.
+    
+    Args:
+        `controller_ids` (str, list, tuple): Controller ID or list of IDs
+    """
+
+    if isinstance(controller_ids, str): controller_ids = [controller_ids]
+    controller_ids = validate_list_types(controller_ids, str, param_name="controller_ids", curr_sim_step=self.curr_step)
+
+    for controller_id in controller_ids:
+        if self.controller_exists(controller_id) != None:
+            if self.controllers[controller_id].activated:
+                self.controllers[controller_id].deactivate()
+            del self.controllers[controller_id]
+        else:
+            desc = "Controller with ID '{0}' not found.".format(controller_id)
+            raise_error(KeyError, desc, self.curr_step)
