@@ -1,5 +1,5 @@
 import csv, datetime, copy, pickle, os, string, random as rnd
-import xml.etree.ElementTree as et  
+import xml.etree.ElementTree as et, numpy as np
 from .utils import *
 
 class DemandProfile:
@@ -576,3 +576,61 @@ def _save_xml(data, filename) -> None:
         fp.write('<?xml version="1.0" encoding="UTF-8"?>\n\n')
         fp.write(f'<!-- generated on {now.strftime("%Y-%m-%d %H:%M:%S")} by TUD-SUMO Version {__version__} -->\n\n')
         fp.write(xml_str)
+
+def _add_demand_vehicles(self) -> None:
+    """ Implements demand in the demand table. """
+
+    if self._manual_flow and len(self._demand_profiles) > 0:
+
+        for demand_profile in self._demand_profiles.values():
+            
+            if not demand_profile.active: continue
+            
+            for demand_arr in demand_profile._demand_arrs:
+                step_range = demand_arr[1]
+                if self.curr_step < step_range[0]: continue
+                elif self.curr_step > step_range[1]: continue
+
+                routing = demand_arr[0]
+                veh_per_step = (demand_arr[2] / 3600) * self.step_length
+                vehicle_types = demand_arr[3]
+                vehicle_type_dists = demand_arr[4]
+                initial_speed = demand_arr[5]
+                origin_lane = demand_arr[6]
+                origin_pos = demand_arr[7]
+                insertion_sd = demand_arr[8]
+                colour = demand_arr[9]
+                
+                added = 0
+                if veh_per_step <= 0: continue
+                elif veh_per_step < 1:
+                    # If the number of vehicles to create per step is less than 0,
+                    # use veh_per_step as a probability to add a new vehicle
+                    n_vehicles = 1 if rnd.random() < veh_per_step else 0
+                else:
+                    # Calculate the number of vehicles per step to add using a
+                    # normal distribution with veh_per_step and the insertion_sd (standard deviation)
+                    if insertion_sd > 0: n_vehicles = round(np.random.normal(veh_per_step, veh_per_step * insertion_sd, 1)[0])
+                    else: n_vehicles = veh_per_step
+
+                n_vehicles = max(0, n_vehicles)
+                vehicle_ids = []
+
+                while added < n_vehicles:
+                    if isinstance(vehicle_types, list):
+                        vehicle_type = rnd.choices(vehicle_types, vehicle_type_dists, k=1)[0]
+                    else: vehicle_type = vehicle_types
+
+                    vehicle_id = "{0}_md_{1}".format(vehicle_type, self._man_flow_id)
+                    
+                    self.add_vehicle(vehicle_id, vehicle_type, routing, initial_speed=initial_speed, origin_lane=origin_lane, origin_pos=origin_pos)
+
+                    vehicle_ids.append(vehicle_id)
+                    added += 1
+                    self._man_flow_id += 1
+
+                if colour != None: self.set_vehicle_vals(vehicle_ids, colour=colour)
+
+    elif not self._suppress_warnings:
+        desc = "Cannot add flow manually (no demand profiles)."
+        raise_warning(desc, self.curr_step)

@@ -1,6 +1,6 @@
 import json, math, os, pickle as pkl
 from copy import deepcopy
-from random import random
+from random import random, choices, choice
 from .utils import *
 
 class EventScheduler:
@@ -500,3 +500,221 @@ class Event:
 
         if self.remove_affected_vehicles:
             self.sim.remove_vehicles(vehicle_id)
+
+
+def _cause_incident(self,
+                    duration: int,
+                    vehicle_ids: str | list | tuple | None = None,
+                    geometry_ids: str | list | tuple = None,
+                    n_vehicles: int = 1,
+                    vehicle_separation: float = 0,
+                    assert_n_vehicles: bool = False,
+                    edge_speed: int | float | None = -1,
+                    position: int | float | None = None,
+                    highlight_vehicles: bool = True,
+                    incident_id: str | None = None
+                    ) -> bool:
+    """
+    Simulates an incident by stopping vehicle(s) on the following edge in their route for a
+    period of time, before removing them from the simulation. Vehicle(s) can either be specified
+    using `vehicle_ids`, chosen randomly based location using `geometry_ids`, or vehicles can
+    be chosen randomly throughout the network if neither `vehicle_ids` or `geometry_ids` are given.
+    
+    Args:
+        `duration` (int): Duration of incident (in seconds)
+        `vehicle_ids` (str, list, tuple, optional): Vehicle ID or list of IDs to include in the incident
+        `geometry_ids` (str, list, tuple, optional): Geometry ID or list of IDs to randomly select vehicles from
+        `n_vehicles` (int): Number of vehicles in the incident, if randomly chosen
+        `vehicle_separation` (float): Factor denoting how separated randomly chosen vehicles are (0.1-1)
+        `assert_n_vehicles` (bool): Denotes whether to throw an error if the correct number of vehicles cannot be found
+        `edge_speed` (int, float, None, optional): New max speed for edges where incident vehicles are located (defaults to 15km/h or 10mph). Set to `None` to not change speed.
+        `position` (int, float, optional): Distance along edge where vehicle will stop [0 (start) - 1 (end)]
+        `highlight_vehicles` (bool): Denotes whether to highlight vehicles in the SUMO GUI
+        `incident_id` (str, optional): Incident event ID used in the simulation data file (defaults to '_incident_{n}_')
+
+    Returns:
+        bool: Denotes whether incident was successfully created
+    """
+    
+    if self._scheduler == None:
+        self._scheduler = EventScheduler(self)
+        
+    if incident_id == None:
+        id_idx = 1
+        while self._scheduler.get_event_status("incident_{0}".format(id_idx)) != None: id_idx += 1
+        incident_id = "incident_{0}".format(id_idx)
+
+    event_dict = {"start_time": (self.curr_step + 1) * self.step_length, "end_time": (self.curr_step * self.step_length) + duration}
+    
+    check_n_vehicles = vehicle_ids == None
+
+    # Completely random incident (no location or vehicles specified)
+    if geometry_ids == None and vehicle_ids == None:
+        if n_vehicles < len(self._all_curr_vehicle_ids) and n_vehicles > 0:
+            all_geometry_ids, geometry_ids, vehicle_ids, found_central = list(self._all_edges), [], [], False
+
+            # A central edge is chosen (one that contains at least 1 vehicle)
+            while not found_central:
+                central_id = choice(all_geometry_ids)
+                found_central = self.get_geometry_vals(central_id, "vehicle_count") > 0 and not central_id.startswith(":")
+
+            vehicle_separation = min(0.9, max(0, vehicle_separation))
+            searched, to_search, prob = [], [central_id], 1 - vehicle_separation
+
+            # Then, vehicles are chosen for the incident, starting on the central edge.
+            while len(vehicle_ids) < n_vehicles and len(to_search) > 0:
+                curr_geometry_id = choice(to_search)
+
+                all_geometry_vehicles = self.get_geometry_vals(curr_geometry_id, "vehicle_ids")
+                
+                for g_veh_id in all_geometry_vehicles:
+
+                    # Vehicles are chosen randomly using the vehicle_separation
+                    # parameter as the probability. High vehicle separation will likely
+                    # mean vehicles are spread across different edges (assuming n_vehicles is also high)
+                    if random() < prob:
+                        vehicle_ids.append(g_veh_id)
+                        geometry_ids.append(curr_geometry_id)
+                        if len(vehicle_ids) >= n_vehicles:
+                            break
+
+                if len(vehicle_ids) < n_vehicles:
+                    to_search.remove(curr_geometry_id)
+                    searched.append(curr_geometry_id)
+                    
+                    connected_edges = self.get_geometry_vals(curr_geometry_id, "connected_edges")
+                    to_search += connected_edges['incoming']
+                    to_search += connected_edges['outgoing']
+
+                    # If there are still not enough vehicles, we then search an adjacent edge.
+                    to_search = [g_id for g_id in to_search if g_id not in searched and not g_id.startswith(":")]
+
+            geometry_ids = list(set(geometry_ids))
+
+        else:
+            desc = "Invalid n_vehicles '{0}' (must be 0 < '{0}' < no. vehicles in the simulation '{1}').".format(n_vehicles, len(self._all_curr_vehicle_ids))
+            raise_error(ValueError, desc, self.curr_step)
+
+    # Location specified, but vehicles are randomly chosen
+    elif geometry_ids != None and vehicle_ids == None:
+        if isinstance(geometry_ids, str): geometry_ids = [geometry_ids]
+        geometry_ids = validate_list_types(geometry_ids, str, param_name="geometry_ids", curr_sim_step=self.curr_step)
+
+        all_geometry_vehicles = self.get_last_step_geometry_vehicles(geometry_ids)
+        vehicle_ids = choices(all_geometry_vehicles, k=min(n_vehicles, len(all_geometry_vehicles)))
+
+    # Neither location or vehicles specified - an error is thrown
+    elif geometry_ids != None and vehicle_ids != None:
+        desc = "Invalid inputs (cannot use both vehicle_ids and geometry_ids)."
+        raise_error(ValueError, desc, self.curr_step)
+        
+    if check_n_vehicles:
+        if len(vehicle_ids) != n_vehicles:
+            if assert_n_vehicles:
+                desc = f"Incident could not be started (could not find enough vehicles, {len(vehicle_ids)} != {n_vehicles})."
+                raise_error(SimulationError, desc, self.curr_step)
+            else:
+                if not self._suppress_warnings: raise_warning(f"Incident could not be started (could not find enough vehicles, {len(vehicle_ids)} != {n_vehicles}).")
+                return False
+
+    # Either specific vehicles are given to be included in the incident, or
+    # vehicle_ids contains the list of randomly selected vehicles
+    if vehicle_ids != None:
+        if isinstance(vehicle_ids, str): vehicle_ids = [vehicle_ids]
+        vehicle_ids = validate_list_types(vehicle_ids, str, param_name="vehicle_ids", curr_sim_step=self.curr_step)
+
+        for vehicle_id in vehicle_ids:
+            if not self.vehicle_exists(vehicle_id):
+                desc = "Unrecognised vehicle ID given ('{0}').".format(vehicle_id)
+                raise_error(KeyError, desc, self.curr_step)
+            elif highlight_vehicles:
+                self.set_vehicle_vals(vehicle_id, highlight=True)
+                self.stop_vehicle(vehicle_id, duration=duration, pos=position)
+
+        if "vehicles" in event_dict: event_dict["vehicles"]["vehicle_ids"] = vehicle_ids
+    
+        if edge_speed != None:
+            if edge_speed < 0: edge_speed = 15 if self.units.name == "METRIC" else 10
+            if geometry_ids == None: geometry_ids = [self.get_vehicle_vals(veh_id, "next_edge_id") for veh_id in vehicle_ids]
+            event_dict["edges"] = {"edge_ids": geometry_ids, "actions": {"max_speed": edge_speed}}
+
+    self.add_events({incident_id: event_dict})
+    return True
+
+def _add_weather(self,
+                duration: int | float,
+                strength: float = 0.2,
+                locations: list | tuple | None = None,
+                weather_id: str | None = None,
+                headway_increase: int | float | None = None,
+                imperfection_increase: int | float | None = None,
+                acceleration_reduction: int | float | None = None,
+                speed_f_reduction: float | int | None = None
+                ) -> str:
+    """
+    Starts simulating weather effects in the next time step. Both desired time headway and driver imperfection
+    are increased, whilst acceleration/deceleration and driver speed factor are reduced. The increase/reduction
+    can either be defined individually or using the `strength` parameter, which is otherwise used as the default
+    increase/reduction.
+
+    Weather can be localised by setting `locations` to a list of geometry IDs, or can be made network-wide by
+    omitting `locations`.
+
+    Args:
+        `duration` (int, float): Duration of active weather effects in seconds
+        `strength` (float): Used as the default reduction/increase value when not given (defaults to 0.2)
+        `locations` (list, tuple, optional): List of edge/lane IDs where effects will be active (defaults to network-wide effects)
+        `weather_id` (str, optional): Event ID (defaults to 'weather_x', where x is the )
+        `headway_increase` (int, float, optional): Percent increase to vehicle type desired time headway (tau)
+        `imperfection_increase` (int, float, optional): Percent increase to vehicle type imperfection value (sigma)
+        `acceleration_reduction` (int, float, optional): Percent reduction to vehicle type maximum acceleration/deceleration
+        `speed_f_reduction` (int, float, optional): Percent reduction to vehicle type speed factor, used to calculate vehicle speed based on speed limit
+
+    Returns:
+        str: Weather event ID
+    """
+
+    # internal lanes?
+
+    if locations != None and isinstance(locations, (list, tuple)):
+        for edge in locations:
+            if self.geometry_exists(edge) == None:
+                desc = f"Unrecognised geometry ID '{edge}'."
+                raise_error(KeyError, desc, self.curr_step)
+    else: locations = self._all_edges
+
+    if weather_id == None: weather_id = f"weather_{len(self._weather_events) + 1}"
+    if weather_id in self._weather_events:
+        desc = f"Invalid weather event ID '{weather_id}' (already exists)."
+        raise_error(KeyError, desc, self.curr_step)
+
+    w_effects = {}
+    w_effects["headway"] = 1 + strength if headway_increase == None else 1 + headway_increase
+    w_effects["imperfection"] = 1 + strength if imperfection_increase == None else 1 + imperfection_increase
+    w_effects["max_acceleration"] = 1 - strength if acceleration_reduction == None else 1 - acceleration_reduction
+    w_effects["max_deceleration"] = 1 - strength if acceleration_reduction == None else 1 - acceleration_reduction
+    w_effects["speed_factor"] = 1 - strength if speed_f_reduction == None else 1 - speed_f_reduction
+
+    w_effects = {key: val for key, val in w_effects.items() if val != 1}
+
+    if len(w_effects) == 0:
+        desc = "Could not add weather effects (no changes set - increase strength)."
+        raise_error(ValueError, desc, self.curr_step)
+
+    event_dict = {weather_id: {
+                    "start_step": self.curr_step + 1,
+                    "end_step": self.curr_step + ((duration + 1) / self.step_length),
+                    "vehicles": {
+                        "locations": locations,
+                        "actions": w_effects,
+                        "effect_probability": 1,
+                        "remove_affected_vehicles": False,
+                        "r_effects": True,
+                        "location_only": True,
+                        "force_end": True
+                        }
+                    }}
+    
+    self.add_events(event_dict)
+    self._weather_events.add(weather_id)
+    return weather_id
