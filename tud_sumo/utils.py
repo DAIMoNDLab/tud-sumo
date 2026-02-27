@@ -537,3 +537,6 @@ def test_input_dict(input_dict, valid_params, dict_name="", required=None) -> st
             return (TypeError, desc)
         
     return (None, None)
+
+class SimulationError(Exception):
+    pass
