@@ -26,7 +26,7 @@ A research-oriented wrapper for SUMO<sup>[1]</sup> in python, developed for the 
 
 ## Requirements 
 
-Python 3.10 or later is required. Dependencies are; `tqdm`, `matplotlib`, `mpl-tools`, `shapely`, `requests`, `moviepy`, `sumolib` and `traci`.
+Python 3.10 or later is required. Dependencies are; `tqdm`, `matplotlib`, `mpl-tools`, `shapely`, `requests`, `moviepy`, `sumolib`, `scipy` and `traci`.
 
 ## Contact Information
 
