@@ -28,14 +28,29 @@ A research-oriented wrapper for SUMO<sup>[1]</sup> in python, developed for the 
 
 Python 3.10 or later is required. Dependencies are; `tqdm`, `matplotlib`, `mpl-tools`, `shapely`, `requests`, `moviepy`, `sumolib`, `scipy` and `traci`.
 
-## Contact Information
+## Using TUD-SUMO
 
-TUD-SUMO is developed in the DAIMoND lab of TU Delft. For any questions or feedback, please contact Callum Evans at _c.evans@tudelft.nl_. Bug reports can be created in the GitHub repository: [github.com/DAIMoNDLab/tud-sumo-examples](https://github.com/DAIMoNDLab/tud-sumo-examples).
+TUD-SUMO is developed in the DAIMoND lab of TU Delft. For any questions or feedback, please contact Callum Evans at <span class="highlight">_c.evans@tudelft.nl_</span>. Bug reports can be created in the GitHub repository: [github.com/DAIMoNDLab/tud-sumo](https://github.com/DAIMoNDLab/tud-sumo/).
+
+If you decide to use TUD-SUMO in your projects, please cite the current preprint software publication using:
+
+```bibtex
+@misc{evans_tud_sumo_2026,
+	title = {TUD-SUMO: A Research-oriented SUMO Wrapper for Traffic Simulation in Python},
+	shorttitle = {TUD-SUMO},
+	doi = {10.2139/ssrn.6549528},
+	publisher = {Social Science Research Network},
+	author = {Evans, Callum Done and Rinaldi, Marco and Taale, Henk and Hoogendoorn, Serge},
+	month = apr,
+	year = {2026},
+	keywords = {Adaptive Traffic Control, Python, SUMO, Traffic Simulation},
+}
+```
 
 ## Acknowledgements
 
 TUD-SUMO is part of the research under the project "_AI in Network Management_," funded by Rijkswaterstaat, grant agreement nr. 31179439, under the label of ITS Edulab.
 
-## Citations
+## References
 
   1. "_Microscopic Traffic Simulation using SUMO_"; Pablo Alvarez Lopez, Michael Behrisch, Laura Bieker-Walz, Jakob Erdmann, Yun-Pang Flötteröd, Robert Hilbrich, Leonhard Lücken, Johannes Rummel, Peter Wagner, and Evamarie Wießner. _IEEE Intelligent Transportation Systems Conference (ITSC)_, 2018.
