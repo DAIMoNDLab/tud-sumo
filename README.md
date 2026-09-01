@@ -45,7 +45,7 @@ If you decide to use TUD-SUMO in your projects, please cite our SoftwareX public
 	issn = {2352-7110},
 	doi = {https://doi.org/10.1016/j.softx.2026.102745},
 	url = {https://www.sciencedirect.com/science/article/pii/S2352711026002372},
-  	publisher={Elsevier}
+  	publisher={Elsevier},
 	keywords = {Adaptive Traffic Control, Python, SUMO, Traffic Simulation}
 }
 ```
