@@ -1534,7 +1534,7 @@ class Simulation:
             functions (function, list): Function (or function name) or list of functions
         """
         
-        self._remove_v_func(functions, "in")
+        _vehicles._remove_v_func(functions, "in")
 
     def add_vehicle_out_functions(self, functions, parameters: dict | None = None) -> None:
         """
@@ -1557,7 +1557,7 @@ class Simulation:
             `functions` (function, list): Function (or function name) or list of functions
         """
         
-        self._remove_v_func(functions, "out")
+        _vehicles._remove_v_func(functions, "out")
 
     def update_vehicle_function_parameters(self, parameters: dict) -> None:
         """
