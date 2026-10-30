@@ -561,7 +561,7 @@ class Plotter(_GenericPlotter):
 
         start = convert_units(start, "steps", self.time_unit, step)
         end = convert_units(end, "steps", self.time_unit, step)
-        times = convert_units(times, "steps", self.time_unit, step)
+        times = convert_units(times, "steps", self.time_unit, step, keep_arr=True)
         if time_range == None: time_range = [-math.inf, math.inf]
 
         is_subplot = ax != None
@@ -571,7 +571,9 @@ class Plotter(_GenericPlotter):
         label, width, zorder = "Metering Rate", 1.5, 3
         
         for idx, (time, rate) in enumerate(zip(times, rates)):
-            if idx > 0:
+            if len(rates) == 1:
+                ax.plot([max(start, time), max(end, time)], [rate, rate], color=colour, label=label, linewidth=width, zorder=zorder)
+            elif idx > 0:
                 prev_line_start, prev_line_end = times[int(idx - 1)], time
 
                 if prev_line_start >= time_range[1]:
@@ -594,7 +596,7 @@ class Plotter(_GenericPlotter):
 
             prev_rate = rate
 
-        if prev_line_end < time_range[1]:
+        if len(rates) > 1 and prev_line_end < time_range[1]:
             ax.plot([prev_line_end, min(end, time_range[1])], [prev_rate, prev_rate], color=colour, label=label, linewidth=width, zorder=zorder)
 
         xlim = [start, end]
