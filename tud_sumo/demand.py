@@ -168,14 +168,14 @@ class DemandProfile:
             sumo_names = {'vehicle_class': 'vClass', 'colour': 'color', 'length': 'length', 'height': 'height', 'mass': 'mass',
                           'speed_factor': 'speedFactor', 'speed_dev': 'speedDev', 'min_gap': 'minGap', 'max_acceleration': 'accel',
                           'max_deceleration': 'decel', 'tau': 'tau', 'max_lateral_speed': 'maxSpeedLat',  'emission_class': "emissionClass",
-                          'gui_shape': 'guiShape'}
+                          'gui_shape': 'guiShape', 'width': 'width', 'max_speed': 'maxSpeed', 'imperfection': 'sigma'}
 
             root.append(et.Comment(" VTypes "))
 
             for vehicle_type_id, vehicle_type_data in self._vehicle_types.items():
                 
                 attributes = {"id": vehicle_type_id}
-                sumo_attributes = {sumo_names[name]: value for name, value in vehicle_type_data.items() if value != None}
+                sumo_attributes = {sumo_names[name]: str(value) for name, value in vehicle_type_data.items() if value != None}
 
                 if "color" in sumo_attributes:
                     if sumo_attributes["color"] not in sumo_colours:
