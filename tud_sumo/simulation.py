@@ -665,7 +665,7 @@ class Simulation:
 
         if self._recorder != None:
             for recording in self._recorder.get_recordings():
-                self.save_recording(recording)
+                self._recorder.save_recording(recording)
 
         try:
             traci.close()
