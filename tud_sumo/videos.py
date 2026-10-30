@@ -177,7 +177,6 @@ class Recorder():
 
         default_bounds = self.sim.get_view_boundaries(view_id)
         default_zoom = self.sim.get_view_zoom(view_id)
-        if zoom == None: zoom = default_zoom
 
         if video_filename == None: video_filename = recording_id + ".mp4"
 

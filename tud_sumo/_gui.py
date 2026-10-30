@@ -89,11 +89,11 @@ def _set_view(self, view_id: str | None = None, bounds: list | tuple | None = No
     if bounds == None and zoom == None:
         desc = "Invalid bounds and zoom (both cannot be 'None')."
         raise_error(ValueError, desc, self.curr_step)
-    
+
+    if zoom != None: traci.gui.setZoom(view_id, zoom)
     if bounds != None:
         _ = validate_list_types(bounds, (tuple, tuple), True, "bounds", self.curr_step)
         traci.gui.setBoundary(view_id, bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1])
-    if zoom != None: traci.gui.setZoom(view_id, zoom)
 
 def _remove_view(self, view_id: str) -> None:
     """
