@@ -9,6 +9,14 @@ class DemandProfile:
 
         self.id = None
         self._sim = None
+
+        self._demand_headers = ["routing", "step_range", "veh/hour", "vehicle_types", "vehicle_type_dists",
+                                "init_speed", "origin_lane", "origin_pos", "insertion_sd", "colour"]
+        self._demand_arrs = []
+
+        self._vehicle_types = {}
+
+        self.active = True
     
         if simulation != None:
             self.add_to_simulation(simulation)
@@ -18,14 +26,6 @@ class DemandProfile:
         else:
             desc = "No Simulation object or step length given."
             raise_error(ValueError, desc)
-
-        self._demand_headers = ["routing", "step_range", "veh/hour", "vehicle_types", "vehicle_type_dists",
-                                "init_speed", "origin_lane", "origin_pos", "insertion_sd", "colour"]
-        self._demand_arrs = []
-
-        self._vehicle_types = {}
-
-        self.active = True
 
     def __name__(self): return "DemandProfile"
 
