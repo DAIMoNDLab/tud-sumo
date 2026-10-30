@@ -58,7 +58,7 @@ def _remove_vehicle_subscriptions(self, vehicle_ids: str | list | tuple) -> None
 def _add_detector_subscriptions(self, detector_ids: str | list | tuple, data_keys: str | list | tuple) -> None:
     """
     Creates a new subscription for certain variables for **specific detectors**. Valid data keys are;
-    '_vehicle_count_', '_vehicle_ids_', '_speed_', '_halting_no_', '_occupancy_', '_last_detection_'.
+    '_vehicle_count_', '_vehicle_ids_', '_lsm_speed_', '_halting_no_', '_lsm_occupancy_', '_last_detection_'.
     
     Args:
         `detector_id` (str, list, tuple): Detector ID or list of IDs

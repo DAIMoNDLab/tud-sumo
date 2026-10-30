@@ -183,17 +183,17 @@ class Simulation:
         if config_file != None:
             if config_file.endswith(".sumocfg"):
                 self._sumo_cfg = config_file
-                sumoCMD += ["-c", config_file]
+                sumoCMD += ["--configuration-file", config_file]
             else:
                 desc = "Invalid config file extension."
                 raise_error(ValueError, desc)
         else:
             self._sumo_cfg = None
-            sumoCMD += ["-n", net_file]
+            sumoCMD += ["--net-file", net_file]
             
-        if route_file != None: sumoCMD += ["-r", route_file]
-        if add_file != None: sumoCMD += ["-a", add_file]
-        if gui_file != None: sumoCMD += ["-c", gui_file]
+        if route_file != None: sumoCMD += ["--route-files", route_file]
+        if add_file != None: sumoCMD += ["--additional-files", add_file]
+        if gui_file != None: sumoCMD += ["--gui-settings-file", gui_file]
         
         if self.scenario_name == None:
             for filename in [config_file, net_file, route_file, add_file]:
