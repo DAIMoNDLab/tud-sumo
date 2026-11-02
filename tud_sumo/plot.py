@@ -2518,6 +2518,7 @@ class MultiPlotter(_GenericPlotter):
                 y_vals, x_vals = get_aggregated_data(y_vals, x_vals, aggregation_steps)
 
             if sim_id not in self.sim_groups:
+                max_y_val = max(max_y_val, max(y_vals))
                 colour, line_style = self._get_colour("WHEEL", plotted==0)
                 ax.plot(x_vals, y_vals, label=self.sim_labels[sim_id], color=colour, linestyle=line_style, linewidth=1)
                 plotted += 1
@@ -2595,6 +2596,7 @@ class MultiPlotter(_GenericPlotter):
                 y_vals, x_vals = get_aggregated_data(y_vals, x_vals, aggregation_steps)
 
             if sim_id not in self.sim_groups:
+                max_y_val = max(max_y_val, max(y_vals))
                 colour, line_style = self._get_colour("WHEEL", plotted==0)
                 ax.plot(x_vals, y_vals, label=self.sim_labels[sim_id], color=colour, linestyle=line_style, linewidth=1)
                 plotted += 1
@@ -2674,6 +2676,7 @@ class MultiPlotter(_GenericPlotter):
                 y_vals, x_vals = get_aggregated_data(y_vals, x_vals, aggregation_steps)
 
             if sim_id not in self.sim_groups:
+                max_y_val = max(max_y_val, max(y_vals))
                 colour, line_style = self._get_colour("WHEEL", plotted==0)
                 ax.plot(x_vals, y_vals, label=self.sim_labels[sim_id], color=colour, linestyle=line_style, linewidth=1)
                 plotted += 1
@@ -2730,6 +2733,7 @@ class MultiPlotter(_GenericPlotter):
             x_lim = [min(min(x_vals), x_lim[0]), max(max(x_vals), x_lim[1])]
 
             if sim_id not in self.sim_groups:
+                max_y_val = max(max_y_val, max(y_vals))
                 colour, line_style = self._get_colour("WHEEL", plotted==0)
                 ax.plot(x_vals, y_vals, label=self.sim_labels[sim_id], color=colour, linestyle=line_style, linewidth=1)
                 plotted += 1
@@ -2807,6 +2811,7 @@ class MultiPlotter(_GenericPlotter):
                         y_vals, x_vals = get_aggregated_data(y_vals, x_vals, aggregation_steps)
                     
                     if sim_id not in self.sim_groups:
+                        max_y_val = max(max_y_val, max(y_vals))
                         colour, line_style = self._get_colour("WHEEL", plotted==0)
                         ax.plot(x_vals, y_vals, label=self.sim_labels[sim_id], color=colour, linestyle=line_style, linewidth=1)
                         plotted += 1
